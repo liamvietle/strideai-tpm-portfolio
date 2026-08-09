@@ -90,3 +90,7 @@ Monitor:
 - Confidence distribution
 - Infrastructure utilization
 - Cost per active runner
+
+## Security & data governance
+
+Wearable and health-related data should be encrypted in transit and at rest, access-controlled by service/user identity, retained only as long as required, and audited for sensitive-data access. Provider OAuth tokens should be stored separately from coaching data.
