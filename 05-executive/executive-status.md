@@ -5,7 +5,7 @@
 
 ## Executive summary
 
-StrideAI remains positioned for the announced commercial launch date, but recommendation quality is the primary program risk. Current performance is approximately 74%, below the 80% production target.
+StrideAI remains positioned for the announced commercial launch date, but recommendation quality is the primary program risk. Scenario assumption: During the simulated Week-3 evaluation gate, expert agreement is assumed to be 74% against an MVP target of ≥80%.
 
 A dedicated fatigue-model task force is investigating the gap, evaluating alternative signals, and assessing resource/timeline requirements.
 
