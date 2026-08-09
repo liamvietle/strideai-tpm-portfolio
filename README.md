@@ -138,7 +138,7 @@ Each expansion requires explicit quality, safety and reliability gates.
 
 ## Controlled rollout
 
-Internal → Beta → 20% → 40% → 100%. Each stage requires explicit quality, safety and reliability gates before expanding exposure, with predefined rollback criteria.
+Scenario assumption: Internal → Beta → 20% → 40% → 100%. Each stage requires explicit quality, safety and reliability gates before expanding exposure, with predefined rollback criteria.
 
 ![StrideAI rollout](docs/images/rollout.svg)
 
