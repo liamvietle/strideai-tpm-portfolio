@@ -29,6 +29,13 @@ Use multiple evidence sources:
 ### Expert review
 Qualified running/sports-science reviewers assess anonymized scenarios.
 
+### Recommendation-quality definition
+
+For the MVP launch gate, recommendation quality is measured as **expert agreement rate**: the percentage of evaluation scenarios in which qualified reviewers judge the proposed training adaptation to be appropriate against a predefined evaluation rubric.
+The production target is **≥80% expert agreement** on the agreed evaluation dataset.
+The 74% → 80% program risk therefore refers to expert-rated recommendation appropriateness, not a generic model-accuracy metric.
+Expert agreement is combined with historical backtesting and safety evaluation before production rollout.
+
 ### Historical backtesting
 Replay historical data and compare simulated recommendations with subsequent outcomes.
 
@@ -61,8 +68,8 @@ Acceptance is not treated as proof of correctness.
 
 | Metric | Target | Category |
 |---|---:|---|
-| Fatigue model F1 | Defined by DS | Model |
-| Expert agreement | ≥80% target | Decision |
+| Fatigue model F1 | DS-defined gate | Model |
+| Expert agreement | ≥80% target | Decision quality |
 | Critical safety violations | 0 | Safety |
 | Recommendation acceptance | >70% | Product |
 | 30-day retention | >50% | Product |
