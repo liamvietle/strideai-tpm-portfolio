@@ -216,8 +216,7 @@ The case study includes:
 
 ## TPM leadership lens
 
-The purpose of this case study is not to demonstrate that I can build a running app myself.
-
+The purpose of this case study is to demonstrate how I would lead a complex AI technical program across Product, Engineering, Data Science, QA and Platform
 It demonstrates how I would:
 
 1. Translate product strategy into executable technical work.
