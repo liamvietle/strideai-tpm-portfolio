@@ -1,4 +1,4 @@
-# StrideAI — AI Adaptive Running Coach
+# StrideAI — AI Adaptive Coaching Technical Program Case Study
 
 ### AI Technical Program Management Case Study — StrideAI
 
