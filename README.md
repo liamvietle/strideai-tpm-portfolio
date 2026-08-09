@@ -231,16 +231,6 @@ It demonstrates how I would:
 
 ---
 
-## Interview walkthrough
-
-The project can be summarized in three minutes:
-
-> "I recently built a portfolio case study around an AI adaptive running coach. I used it to demonstrate how I would approach a complex AI technical program from product strategy through architecture, execution, risk management and launch..."
-
-See the executive presentation for the complete story.
-
----
-
 ## Disclaimer
 
 This is a simulated portfolio case study created to demonstrate technical program management, AI product thinking and cross-functional execution. It is not presented as a production product or prior employment experience.
