@@ -91,6 +91,15 @@ Monitor:
 - Infrastructure utilization
 - Cost per active runner
 
-## Security & data governance
+## Security & Data Governance
 
-Wearable and health-related data should be encrypted in transit and at rest, access-controlled by service/user identity, retained only as long as required, and audited for sensitive-data access. Provider OAuth tokens should be stored separately from coaching data.
+StrideAI processes wearable and recovery-related user data, so privacy and data governance are treated as architecture requirements rather than post-launch considerations.
+Key controls:
+* Encrypt sensitive data in transit and at rest.
+* Use least-privilege access controls between services.
+* Store wearable provider OAuth credentials/tokens separately from coaching data.
+* Record and audit access to sensitive user data.
+* Minimize retained data to what is required for coaching, evaluation, and agreed product analytics.
+* Apply explicit retention and deletion policies for user and wearable data.
+* Avoid sending unnecessary raw personal data to the LLM; provide only the structured decision factors required for explanation.
+* Maintain data provenance so recommendations can be traced back to the input data and model/rules versions used.
