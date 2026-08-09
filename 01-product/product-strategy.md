@@ -43,3 +43,22 @@ If performance and recovery signals indicate elevated fatigue with high confiden
 If confidence is medium, recommend the change and request confirmation.
 
 If confidence is low, do not automatically change the plan and explain the data limitation.
+
+## Success metrics
+
+Business
+
+- 200K downloads
+- 20% premium conversion
+- 50% 30-day retention
+
+Product
+
+- 70% recommendation acceptance
+- 4.7/5 average rating
+
+AI
+
+- ≥80% agreed recommendation-quality threshold
+- 0 confirmed critical safety violations
+- 0 low-confidence automatic adaptations
