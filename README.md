@@ -1,6 +1,6 @@
 # StrideAI — AI Adaptive Running Coach
 
-### Technical Program Management Portfolio Case Study
+### AI Technical Program Management Case Study — StrideAI
 
 > A simulated end-to-end AI product/program case study demonstrating how I would lead a cross-functional program from product strategy through technical architecture, execution, AI evaluation, risk management, and controlled launch.
 
