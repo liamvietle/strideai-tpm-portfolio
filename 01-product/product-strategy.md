@@ -46,6 +46,8 @@ If confidence is low, do not automatically change the plan and explain the data 
 
 ## Success metrics
 
+Illustrative launch success target
+
 Business
 
 - 200K downloads
