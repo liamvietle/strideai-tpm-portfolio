@@ -2,7 +2,7 @@
 
 ### AI Technical Program Management Case Study — StrideAI
 
-> A simulated end-to-end AI product/program case study demonstrating how I would lead a cross-functional program from product strategy through technical architecture, execution, AI evaluation, risk management, and controlled launch.
+> This case study demonstrates how I would lead an AI technical program across Product, Engineering, Data Science, QA and Platform. The scenario is intentionally simulated; the program-management practices, technical trade-offs and executive governance reflect the way I approach complex cross-functional programs.
 
 **Important:** StrideAI is a portfolio simulation, not a production product or prior employment project.
 
