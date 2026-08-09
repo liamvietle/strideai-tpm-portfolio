@@ -66,6 +66,8 @@ Acceptance is not treated as proof of correctness.
 
 ## Quality dashboard
 
+Simulated program metric
+
 | Metric | Target | Category |
 |---|---:|---|
 | Fatigue model F1 | DS-defined gate | Model |
