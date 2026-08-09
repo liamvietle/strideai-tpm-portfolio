@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560">
+<style>
+.t{font-family:Arial,sans-serif;fill:#111}.b{fill:#f5f5f5;stroke:#333;stroke-width:2}.s{font-size:22px;font-weight:bold}.a{stroke:#333;stroke-width:3;fill:none;marker-end:url(#arrow)}
+</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#333"/></marker></defs>
+<rect class="b" x="30" y="230" width="150" height="80" rx="12"/><text class="t s" x="105" y="278" text-anchor="middle">Wearable</text>
+<rect class="b" x="230" y="230" width="170" height="80" rx="12"/><text class="t s" x="315" y="278" text-anchor="middle">API Gateway</text>
+<rect class="b" x="450" y="230" width="190" height="80" rx="12"/><text class="t s" x="545" y="278" text-anchor="middle">Data Processing</text>
+<rect class="b" x="690" y="230" width="190" height="80" rx="12"/><text class="t s" x="785" y="278" text-anchor="middle">Fatigue Model</text>
+<rect class="b" x="930" y="230" width="190" height="80" rx="12"/><text class="t s" x="1025" y="278" text-anchor="middle">Adaptation + Safety</text>
+<rect class="b" x="1170" y="230" width="190" height="80" rx="12"/><text class="t s" x="1265" y="278" text-anchor="middle">LLM Explanation</text>
+<path class="a" d="M180 270 L230 270"/><path class="a" d="M400 270 L450 270"/><path class="a" d="M640 270 L690 270"/><path class="a" d="M880 270 L930 270"/><path class="a" d="M1120 270 L1170 270"/>
+<rect class="b" x="530" y="390" width="340" height="80" rx="12"/><text class="t s" x="700" y="438" text-anchor="middle">Message Queue / Async Processing</text>
+<path class="a" d="M545 310 L545 390"/><path class="a" d="M785 310 L785 390"/>
+</svg>

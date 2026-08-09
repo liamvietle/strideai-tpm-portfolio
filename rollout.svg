@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="300" viewBox="0 0 1400 300">
+<style>.t{font-family:Arial,sans-serif;fill:#111}.b{fill:#f5f5f5;stroke:#333;stroke-width:2}.s{font-size:24px;font-weight:bold}.a{stroke:#333;stroke-width:3;fill:none;marker-end:url(#arrow)}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#333"/></marker></defs>
+<g transform="translate(50,70)">
+<rect class="b" x="0" y="0" width="190" height="80" rx="12"/><text class="t s" x="95" y="48" text-anchor="middle">Internal</text>
+<rect class="b" x="260" y="0" width="190" height="80" rx="12"/><text class="t s" x="355" y="48" text-anchor="middle">Beta</text>
+<rect class="b" x="520" y="0" width="190" height="80" rx="12"/><text class="t s" x="615" y="48" text-anchor="middle">20%</text>
+<rect class="b" x="780" y="0" width="190" height="80" rx="12"/><text class="t s" x="875" y="48" text-anchor="middle">40%</text>
+<rect class="b" x="1040" y="0" width="190" height="80" rx="12"/><text class="t s" x="1135" y="48" text-anchor="middle">100%</text>
+<path class="a" d="M190 40 L260 40"/><path class="a" d="M450 40 L520 40"/><path class="a" d="M710 40 L780 40"/><path class="a" d="M970 40 L1040 40"/>
+<text class="t" x="615" y="145" text-anchor="middle" font-size="20">Quality • Safety • Reliability gates at every expansion</text>
+</g></svg>
