@@ -1,10 +1,18 @@
 # StrideAI — AI Adaptive Coaching Technical Program Case Study
 
-### AI Technical Program Management Case Study — StrideAI
+Viet Le | Technical Program Manager
 
-> This case study demonstrates how I would lead an AI technical program across Product, Engineering, Data Science, QA and Platform. The scenario is intentionally simulated; the program-management practices, technical trade-offs and executive governance reflect the way I approach complex cross-functional programs.
+How would I lead the launch of an AI system where recommendation quality, safety, and uncertainty directly affect user behavior?
 
-**Important:** StrideAI is a portfolio simulation, not a production product or prior employment project.
+StrideAI is a simulated AI running-coach program designed to demonstrate how I approach complex technical programs across Product, Engineering, Data Science, QA, and Platform.
+
+What this case study demonstrates:
+
+- Product → technical requirements
+- Architecture → executable program
+- AI evaluation → launch gates
+- Risk → mitigation → executive decision
+- Controlled rollout → evidence-based scaling
 
 ---
 
@@ -216,22 +224,6 @@ The case study includes:
 
 ---
 
-## TPM leadership lens
-
-The purpose of this case study is to demonstrate how I would lead a complex AI technical program across Product, Engineering, Data Science, QA and Platform
-It demonstrates how I would:
-
-1. Translate product strategy into executable technical work.
-2. Identify the true critical path.
-3. Align Product, Engineering, Data Science, QA and Platform.
-4. Quantify technical/business trade-offs.
-5. Establish measurable AI quality and safety gates.
-6. Manage risks, dependencies and escalation.
-7. Communicate a clear recommendation to executives.
-8. Protect both commercial objectives and technical quality.
-
----
-
 ## Disclaimer
 
-This is a simulated portfolio case study created to demonstrate technical program management, AI product thinking and cross-functional execution. It is not presented as a production product or prior employment experience.
+StrideAI is a simulated case study and is not a production product or prior employment project.
