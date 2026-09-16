@@ -1,11 +1,15 @@
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.responses import HTMLResponse
 
+from app.dashboard import DASHBOARD_HTML
 from app.engine import evaluate_workout
 from app.explanation import build_evidence_package, generate_explanation
 from app.ingestion import parse_garmin_summary_csv, parse_tcx
 from app.models import (
     CoachingRecommendation,
     CoachingResponse,
+    DeploymentMetrics,
+    ExplanationQualitySummary,
     ImportSummary,
     OutcomeInput,
     PersistedCoachingResponse,
@@ -13,19 +17,33 @@ from app.models import (
     WorkoutInput,
 )
 from app.observability import write_trace
+from app.quality import summarize_explanation_records
 from app.retrieval import retrieve_similar_history
-from app.storage import init_db, list_activities, save_outcome, save_recommendation, upsert_activities
+from app.storage import (
+    get_deployment_metrics,
+    init_db,
+    list_activities,
+    list_explanation_records,
+    save_outcome,
+    save_recommendation,
+    upsert_activities,
+)
 
 app = FastAPI(
     title="StrideAI v2",
-    version="0.3.0",
-    description="Persistent running-data ingestion, deterministic coaching, retrieved context, and guarded LLM explanations.",
+    version="0.4.0",
+    description="Persistent AI coaching deployment with outcome feedback, quality gates, and operational metrics.",
 )
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard() -> str:
+    return DASHBOARD_HTML
 
 
 @app.post("/v1/recommendations", response_model=CoachingRecommendation)
@@ -56,7 +74,13 @@ def create_v2_recommendation(payload: WorkoutInput) -> CoachingResponse:
 def create_v3_recommendation(payload: WorkoutInput) -> PersistedCoachingResponse:
     response = _create_v2_response(payload)
     init_db()
-    recommendation_id = save_recommendation(payload, response.recommendation, response.trace)
+    recommendation_id = save_recommendation(
+        payload,
+        response.recommendation,
+        response.trace,
+        explanation=response.explanation,
+        evidence=response.evidence,
+    )
     return PersistedCoachingResponse(
         **response.model_dump(),
         recommendation_id=recommendation_id,
@@ -119,3 +143,19 @@ async def import_garmin_csv_activity(
 def get_activities(athlete_id: str, limit: int = Query(default=100, ge=1, le=1000)) -> list[StoredActivity]:
     init_db()
     return [StoredActivity(**row) for row in list_activities(athlete_id, limit=limit)]
+
+
+@app.get("/v4/metrics", response_model=DeploymentMetrics)
+def deployment_metrics(athlete_id: str | None = None) -> DeploymentMetrics:
+    init_db()
+    return get_deployment_metrics(athlete_id)
+
+
+@app.get("/v4/quality/explanations", response_model=ExplanationQualitySummary)
+def explanation_quality(
+    athlete_id: str | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> ExplanationQualitySummary:
+    init_db()
+    records = list_explanation_records(athlete_id=athlete_id, limit=limit)
+    return summarize_explanation_records(records)
