@@ -11,15 +11,26 @@ from app.personal_models import DailyCheckInInput, PersonalRecommendationRespons
 from app.personal_storage import (
     attach_recommendation,
     calculate_recent_load_ratio,
+    init_personal_app_db,
     prior_checkins,
     upsert_checkin,
 )
 from app.retrieval import load_history, retrieve_similar_history
-from app.storage import save_recommendation
+from app.storage import connect, save_recommendation
 
 
 def _day_index(checkin_date: str) -> int:
     return date.fromisoformat(checkin_date).toordinal()
+
+
+def _locked_checkin_exists(athlete_id: str, checkin_date: str) -> bool:
+    init_personal_app_db()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT recommendation_id FROM daily_checkins WHERE athlete_id=? AND checkin_date=?",
+            (athlete_id, checkin_date),
+        ).fetchone()
+    return bool(row and row["recommendation_id"] is not None)
 
 
 def _snapshot_from_row(row: dict) -> RecoverySnapshot:
@@ -69,6 +80,9 @@ def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWork
 
 
 def create_personal_recommendation(payload: DailyCheckInInput) -> PersonalRecommendationResponse:
+    if _locked_checkin_exists(payload.athlete_id, payload.checkin_date):
+        raise ValueError("This morning decision is already locked. Record the outcome from History instead of regenerating it.")
+
     accumulated_input, calculated_load = build_accumulated_input(payload)
     checkin_id = upsert_checkin(payload, calculated_load_ratio=calculated_load)
 
