@@ -1,5 +1,10 @@
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import HTMLResponse
+from __future__ import annotations
+
+import hmac
+import os
+
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from app.accumulated_fatigue import evaluate_workout_v21
 from app.dashboard import DASHBOARD_HTML
@@ -21,6 +26,11 @@ from app.models import (
 )
 from app.observability import write_trace
 from app.persisted_history import load_persisted_history
+from app.personal_history import list_personal_history
+from app.personal_models import DailyCheckInInput, PersonalRecommendationResponse
+from app.personal_service import create_personal_recommendation
+from app.personal_storage import init_personal_app_db
+from app.personal_ui import PERSONAL_APP_HTML
 from app.quality import summarize_explanation_records
 from app.retrieval import load_history, retrieve_similar_history
 from app.storage import (
@@ -34,10 +44,37 @@ from app.storage import (
 )
 
 app = FastAPI(
-    title="StrideAI v2",
-    version="0.5.0",
-    description="Persistent AI coaching with accumulated-recovery assessment, guarded explanations, outcome feedback, and quality gates.",
+    title="StrideAI",
+    version="1.0.0-personal",
+    description="Personal AI-assisted running coach with accumulated-recovery assessment, guarded explanations, outcome feedback, and real-world validation.",
 )
+
+APP_KEY = os.getenv("STRIDEAI_APP_KEY", "").strip()
+
+
+@app.middleware("http")
+async def optional_personal_access_key(request: Request, call_next):
+    """Protect personal data when STRIDEAI_APP_KEY is configured.
+
+    The app shell and health endpoint stay public so the browser can load and a
+    hosting provider can perform health checks. All API/data endpoints require
+    X-StrideAI-Key when a key is configured.
+    """
+    if APP_KEY and request.url.path not in {"/", "/app", "/health"}:
+        supplied = request.headers.get("X-StrideAI-Key", "")
+        if not hmac.compare_digest(supplied, APP_KEY):
+            return JSONResponse(status_code=401, content={"detail": "StrideAI access key required."})
+    return await call_next(request)
+
+
+@app.on_event("startup")
+def initialize() -> None:
+    init_personal_app_db()
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/app")
 
 
 @app.get("/health")
@@ -45,9 +82,27 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/app", response_class=HTMLResponse, include_in_schema=False)
+def personal_app() -> str:
+    return PERSONAL_APP_HTML
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard() -> str:
     return DASHBOARD_HTML
+
+
+@app.post("/app/api/recommendations", response_model=PersonalRecommendationResponse)
+def personal_recommendation(payload: DailyCheckInInput) -> PersonalRecommendationResponse:
+    return create_personal_recommendation(payload)
+
+
+@app.get("/app/api/history")
+def personal_history(
+    athlete_id: str = "viet",
+    limit: int = Query(default=30, ge=1, le=365),
+) -> list[dict]:
+    return list_personal_history(athlete_id, limit=limit)
 
 
 @app.post("/v1/recommendations", response_model=CoachingRecommendation)
