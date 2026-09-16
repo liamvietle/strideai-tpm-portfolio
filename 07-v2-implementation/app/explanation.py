@@ -111,6 +111,21 @@ def validate_explanation(text: str, approved_action: RecommendationAction) -> bo
     return first_sentence == expected_prefix
 
 
+def _extract_output_text(payload: dict[str, Any]) -> str:
+    direct = payload.get("output_text")
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+
+    pieces: list[str] = []
+    for item in payload.get("output") or []:
+        if item.get("type") != "message":
+            continue
+        for content in item.get("content") or []:
+            if content.get("type") == "output_text" and isinstance(content.get("text"), str):
+                pieces.append(content["text"])
+    return "\n".join(pieces).strip()
+
+
 def _extract_usage(payload: dict[str, Any]) -> tuple[int | None, int | None]:
     usage = payload.get("usage") or {}
     return usage.get("input_tokens"), usage.get("output_tokens")
@@ -176,7 +191,7 @@ def generate_explanation(
         )
         response.raise_for_status()
         payload = response.json()
-        text = (payload.get("output_text") or "").strip()
+        text = _extract_output_text(payload)
         passed = validate_explanation(text, evidence.approved_action)
         input_tokens, output_tokens = _extract_usage(payload)
         latency_ms = int((time.perf_counter() - start) * 1000)
