@@ -1,0 +1,12 @@
+{
+  "athlete_id": "viet-demo",
+  "planned_distance_km": 16,
+  "planned_intensity": "threshold",
+  "recent_load_ratio": 1.42,
+  "hrv_vs_baseline_pct": -16,
+  "resting_hr_delta_bpm": 7,
+  "sleep_hours": 5.6,
+  "soreness_0_10": 6,
+  "pain_flag": false,
+  "recent_race_days_ago": 8
+}
