@@ -1,0 +1,34 @@
+[
+  {
+    "athlete_id": "viet-demo",
+    "session_date": "2026-08-18",
+    "planned_intensity": "threshold",
+    "factor_codes": ["HRV_BELOW_BASELINE", "SLEEP_LOW", "LOAD_ELEVATED"],
+    "action": "reduce_volume",
+    "outcome": "Reduced the workout and recovered to baseline over the next two days."
+  },
+  {
+    "athlete_id": "viet-demo",
+    "session_date": "2026-08-27",
+    "planned_intensity": "easy",
+    "factor_codes": ["SORENESS_ELEVATED"],
+    "action": "maintain",
+    "outcome": "Completed the easy run without worsening soreness."
+  },
+  {
+    "athlete_id": "viet-demo",
+    "session_date": "2026-09-02",
+    "planned_intensity": "interval",
+    "factor_codes": ["RHR_HIGH", "SLEEP_VERY_LOW", "LOAD_SPIKE", "SORENESS_HIGH"],
+    "action": "recovery_only",
+    "outcome": "Skipped intensity and resumed normal training after recovery markers improved."
+  },
+  {
+    "athlete_id": "generic-demo",
+    "session_date": "2026-07-10",
+    "planned_intensity": "threshold",
+    "factor_codes": ["HRV_BELOW_BASELINE", "RHR_ELEVATED"],
+    "action": "reduce_intensity",
+    "outcome": "Lower intensity preserved the session while avoiding additional fatigue."
+  }
+]
