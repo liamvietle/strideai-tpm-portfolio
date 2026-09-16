@@ -4,10 +4,11 @@ import hmac
 import os
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from app.accumulated_fatigue import evaluate_workout_v21
+from app.activity_weather import enrich_weather, recent_activities
 from app.dashboard import DASHBOARD_HTML
 from app.engine import evaluate_workout
 from app.explanation import build_evidence_package, generate_explanation
@@ -146,9 +147,11 @@ def strava_callback(
 
 
 @app.post("/app/api/strava/sync")
-def sync_strava(athlete_id: str = "viet") -> dict[str, object]:
+def sync_strava(background_tasks: BackgroundTasks, athlete_id: str = "viet") -> dict[str, object]:
     try:
-        return sync_strava_activities(athlete_id)
+        result = sync_strava_activities(athlete_id)
+        background_tasks.add_task(enrich_weather, athlete_id)
+        return result
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code if exc.response is not None else 502
         raise HTTPException(status_code=502, detail=f"Strava API returned HTTP {status}.") from exc
@@ -160,6 +163,13 @@ def sync_strava(athlete_id: str = "viet") -> dict[str, object]:
 def remove_strava_connection(athlete_id: str = "viet") -> dict[str, bool]:
     disconnect_strava(athlete_id)
     return {"disconnected": True}
+
+
+@app.get("/app/api/activities")
+def get_recent_activities(
+    athlete_id: str = "viet", limit: int = Query(default=30, ge=1, le=100),
+) -> list[dict]:
+    return recent_activities(athlete_id, limit)
 
 
 @app.post("/v1/recommendations", response_model=CoachingRecommendation)

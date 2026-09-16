@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.daily_ui_v2 import enhance_daily_ui
+from app.activities_ui import ACTIVITIES_CARD, ACTIVITIES_SCRIPT
 
 
 STRAVA_CARD = r'''
@@ -48,6 +49,7 @@ STRAVA_SCRIPT = r'''
     try{
       const data=await stravaApi('/app/api/strava/sync',{method:'POST'});
       lastAutoSync=Date.now();
+      window.dispatchEvent(new Event('strideai:strava-synced'));
       if(status)status.textContent=`Synced ${data.activities??data.fetched} recent activities (${data.running_activities} runs): ${data.inserted} new, ${data.updated} updated.`;
       return data;
     }catch(err){
@@ -120,7 +122,7 @@ STRAVA_SCRIPT = r'''
 def enhance_personal_app(html: str) -> str:
     html = enhance_daily_ui(html).replace('/app/api/daily-checkin', '/app/api/recommendations')
     marker = '<section id="data" class="panel">'
-    enhanced = html.replace(marker, marker + STRAVA_CARD, 1)
+    enhanced = html.replace(marker, marker + STRAVA_CARD + ACTIVITIES_CARD, 1)
     if enhanced == html:
         return html
-    return enhanced.replace('</body>', STRAVA_SCRIPT + '</body>', 1)
+    return enhanced.replace('</body>', ACTIVITIES_SCRIPT + STRAVA_SCRIPT + '</body>', 1)

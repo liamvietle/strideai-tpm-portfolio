@@ -143,3 +143,34 @@ The persistent volume is required so check-ins, activity history and OAuth token
 - SQLite is used instead of a managed cloud database
 
 These boundaries keep the product useful without prematurely turning a personal validation app into a commercial platform.
+
+## Recent activities and weather
+
+Data > Recent Activities shows the newest 30 synced Strava activities, including
+non-running activities. Activity times use the browser's local time zone. Missing
+metrics are omitted, not shown as zero. Running cadence converts Strava's cycle
+cadence to steps/min. Names are rendered as text, never HTML.
+
+Each successful app-triggered Strava sync queues best-effort weather enrichment
+using already stored summary payloads. No additional Strava requests are needed.
+Open-Meteo receives only start coordinates, UTC date and requested weather fields.
+Indoor/trainer and virtual activities are excluded. No location or valid UTC time
+means no lookup. Weather estimates represent the start location and containing
+UTC hour, not the whole route or watch measurements. Recorded Strava temperature
+is shown separately.
+
+Activities under seven days old use Open-Meteo's forecast/past-day model data;
+older activities use its historical reanalysis API. Results are cached in a new
+activity_weather table. Existing activity IDs, raw data, recovery records and
+recommendations are unchanged. A changed time/location invalidates the cache.
+Failures remain unavailable and become eligible for retry after six hours.
+Background work is bounded to 20 requests and a 20-second scheduling budget per
+sync (an in-flight request can finish after that budget). Historical backfill
+continues on later syncs, newest first. Restarted jobs resume on the next sync.
+One worker per process prevents duplicate work in this single-process deployment.
+The UI refreshes after sync and again after 25 seconds; Refresh activities can
+also retrieve the latest result. Weather never enters recommendation inputs.
+
+References: https://open-meteo.com/en/docs and
+https://open-meteo.com/en/docs/historical-weather-api . The free API is for this
+non-commercial personal app; review provider terms before commercial rollout.
