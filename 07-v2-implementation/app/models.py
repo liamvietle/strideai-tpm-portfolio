@@ -141,6 +141,8 @@ class OutcomeInput(BaseModel):
     completed: bool
     perceived_effort_0_10: Optional[int] = Field(default=None, ge=0, le=10)
     pain_after: bool = False
+    followed_recommendation: Optional[bool] = None
+    override_action: Optional[RecommendationAction] = None
     notes: Optional[str] = None
 
 
@@ -150,6 +152,68 @@ class EvaluationSummary(BaseModel):
     action_accuracy: float
     safety_violations: int
     human_review_cases: int
+
+
+class ExplanationQuality(BaseModel):
+    action_consistent: bool
+    evidence_support_rate: float = Field(ge=0, le=1)
+    unsupported_numeric_claims: List[str]
+    groundedness_score: float = Field(ge=0, le=1)
+    grounded: bool
+
+
+class ExplanationQualitySummary(BaseModel):
+    evaluated: int
+    grounded: int
+    groundedness_rate: float = Field(ge=0, le=1)
+    action_consistent: int
+    action_consistency_rate: float = Field(ge=0, le=1)
+    unsupported_numeric_claims: int
+    average_groundedness_score: float = Field(ge=0, le=1)
+
+
+class QualityEvaluationSummary(EvaluationSummary):
+    explanations_grounded: int
+    explanation_groundedness_rate: float = Field(ge=0, le=1)
+    action_consistency_rate: float = Field(ge=0, le=1)
+    unsupported_numeric_claims: int
+
+
+class RegressionComparison(BaseModel):
+    baseline_label: str
+    candidate_label: str
+    baseline_action_accuracy: float
+    candidate_action_accuracy: float
+    action_accuracy_delta: float
+    baseline_safety_violations: int
+    candidate_safety_violations: int
+    safety_violation_delta: int
+    explanation_groundedness_rate: float
+    gate_passed: bool
+    reasons: List[str]
+
+
+class DeploymentMetrics(BaseModel):
+    athlete_id: Optional[str] = None
+    total_recommendations: int
+    outcomes_recorded: int
+    outcome_coverage_rate: float = Field(ge=0, le=1)
+    follow_status_recorded: int
+    followed_count: int
+    overridden_count: int
+    acceptance_rate: Optional[float] = Field(default=None, ge=0, le=1)
+    override_rate: Optional[float] = Field(default=None, ge=0, le=1)
+    completed_count: int
+    completion_rate: Optional[float] = Field(default=None, ge=0, le=1)
+    pain_after_count: int
+    pain_after_rate: Optional[float] = Field(default=None, ge=0, le=1)
+    average_perceived_effort: Optional[float] = Field(default=None, ge=0, le=10)
+    human_review_recommendations: int
+    human_review_rate: float = Field(ge=0, le=1)
+    trace_coverage_rate: float = Field(ge=0, le=1)
+    guardrail_pass_rate: Optional[float] = Field(default=None, ge=0, le=1)
+    fallback_rate: Optional[float] = Field(default=None, ge=0, le=1)
+    average_latency_ms: Optional[float] = Field(default=None, ge=0)
 
 
 class StoredActivity(ActivityRecord):
