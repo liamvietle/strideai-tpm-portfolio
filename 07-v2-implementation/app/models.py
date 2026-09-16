@@ -33,6 +33,27 @@ class RecommendationAction(str, Enum):
     no_change_due_to_missing_data = "no_change_due_to_missing_data"
 
 
+class SubjectiveFatigue(str, Enum):
+    fresh = "fresh"
+    normal = "normal"
+    slightly_tired = "slightly_tired"
+    tired = "tired"
+    very_tired = "very_tired"
+
+
+class AccumulatedFatigueState(str, Enum):
+    low = "low"
+    elevated = "elevated"
+    high = "high"
+    critical = "critical"
+
+
+class OutcomeAssessment(str, Enum):
+    warning_useful_directionally = "warning_useful_directionally"
+    neutral_or_unknown = "neutral_or_unknown"
+    false_alarm = "false_alarm"
+
+
 class WorkoutInput(BaseModel):
     athlete_id: str = Field(min_length=1)
     planned_distance_km: float = Field(gt=0, le=100)
@@ -44,6 +65,30 @@ class WorkoutInput(BaseModel):
     soreness_0_10: Optional[int] = Field(default=None, ge=0, le=10)
     pain_flag: bool = False
     recent_race_days_ago: Optional[int] = Field(default=None, ge=0, le=365)
+
+
+class RecoverySnapshot(BaseModel):
+    day_index: int = Field(ge=0)
+    sleep_hours: Optional[float] = Field(default=None, ge=0, le=24)
+    hrv_ms: Optional[float] = Field(default=None, ge=0)
+    hrv_baseline_low: Optional[float] = Field(default=None, ge=0)
+    hrv_baseline_high: Optional[float] = Field(default=None, ge=0)
+    resting_hr_bpm: Optional[float] = Field(default=None, ge=20, le=220)
+    soreness_0_10: Optional[int] = Field(default=None, ge=0, le=10)
+    pain_flag: bool = False
+    subjective_fatigue: SubjectiveFatigue = SubjectiveFatigue.normal
+    recent_load_ratio: Optional[float] = Field(default=None, ge=0)
+
+
+class AccumulatedWorkoutInput(WorkoutInput):
+    day_index: int = Field(ge=0)
+    hrv_ms: Optional[float] = Field(default=None, ge=0)
+    hrv_baseline_low: Optional[float] = Field(default=None, ge=0)
+    hrv_baseline_high: Optional[float] = Field(default=None, ge=0)
+    resting_hr_bpm: Optional[float] = Field(default=None, ge=20, le=220)
+    subjective_fatigue: SubjectiveFatigue = SubjectiveFatigue.normal
+    days_until_event: Optional[int] = Field(default=None, ge=0, le=365)
+    recovery_history: List[RecoverySnapshot] = Field(default_factory=list)
 
 
 class DecisionFactor(BaseModel):
@@ -62,6 +107,22 @@ class CoachingRecommendation(BaseModel):
     decision_factors: List[DecisionFactor]
     safety_flags: List[str]
     rules_version: str
+
+
+class AccumulatedFatigueAssessment(BaseModel):
+    state: AccumulatedFatigueState
+    score: int = Field(ge=0)
+    has_warning: bool
+    observed_days_3: int = Field(ge=0, le=3)
+    observed_days_7: int = Field(ge=0, le=7)
+    average_sleep_3d: Optional[float] = Field(default=None, ge=0, le=24)
+    average_sleep_7d: Optional[float] = Field(default=None, ge=0, le=24)
+    low_sleep_observations_7d: int = Field(ge=0)
+    very_low_sleep_observations_7d: int = Field(ge=0)
+    hrv_status: str
+    hrv_trend_pct: Optional[float] = None
+    resting_hr_change_bpm: Optional[float] = None
+    contributors: List[str]
 
 
 class HistoricalCase(BaseModel):
@@ -216,6 +277,19 @@ class DeploymentMetrics(BaseModel):
     average_latency_ms: Optional[float] = Field(default=None, ge=0)
 
 
+class RealValidationSummary(BaseModel):
+    cases: int
+    human_exact_agreement: int
+    human_agreement_rate: float = Field(ge=0, le=1)
+    warnings_issued: int
+    action_changes: int
+    useful_warning_cases: int
+    useful_warnings_detected: int
+    outcome_aligned_warning_rate: float = Field(ge=0, le=1)
+    missed_deterioration: int
+    false_alarms: int
+
+
 class StoredActivity(ActivityRecord):
     id: int
     created_at: str
@@ -224,3 +298,8 @@ class StoredActivity(ActivityRecord):
 
 class PersistedCoachingResponse(CoachingResponse):
     recommendation_id: int
+
+
+class V5CoachingResponse(CoachingResponse):
+    recommendation_id: int
+    accumulated_fatigue: AccumulatedFatigueAssessment
