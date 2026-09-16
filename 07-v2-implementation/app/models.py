@@ -162,6 +162,16 @@ class ExplanationQuality(BaseModel):
     grounded: bool
 
 
+class ExplanationQualitySummary(BaseModel):
+    evaluated: int
+    grounded: int
+    groundedness_rate: float = Field(ge=0, le=1)
+    action_consistent: int
+    action_consistency_rate: float = Field(ge=0, le=1)
+    unsupported_numeric_claims: int
+    average_groundedness_score: float = Field(ge=0, le=1)
+
+
 class QualityEvaluationSummary(EvaluationSummary):
     explanations_grounded: int
     explanation_groundedness_rate: float = Field(ge=0, le=1)
