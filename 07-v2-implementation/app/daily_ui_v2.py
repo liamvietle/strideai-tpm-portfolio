@@ -4,7 +4,6 @@ from __future__ import annotations
 FORM_HANDLER = r'''document.addEventListener('submit',async e=>{
   if(e.target.id!=='checkinForm')return;
   e.preventDefault();
-  e.stopImmediatePropagation();
   const $=id=>document.getElementById(id);
   const button=$('recommendBtn');
   const activity=$('planned_activity_type').value;
@@ -31,7 +30,8 @@ FORM_HANDLER = r'''document.addEventListener('submit',async e=>{
   };
   try{
     button.disabled=true;
-    $('submitStatus').textContent=isRun?'Saving your decision and running StrideAI…':'Saving daily recovery check-in…';
+    $('submitStatus').textContent=isRun?'Refreshing Strava and running StrideAI…':'Saving daily recovery check-in…';
+    if(isRun){try{await call('/app/api/strava/sync',{method:'POST'})}catch(err){console.warn('Pre-recommendation Strava refresh skipped:',err.message)}}
     const payload={
       athlete_id:'viet',checkin_date:$('checkin_date').value,planned_activity_type:activity,
       planned_distance_km:activity==='rest'?0:(optional('planned_distance_km')??0),
@@ -136,7 +136,6 @@ def enhance_daily_ui(html: str) -> str:
     history_start = html.find('async function loadHistory()')
     history_end = html.find("$('uploadBtn').addEventListener", history_start)
     if history_start >= 0 and history_end > history_start:
-        # The Garmin card is hidden, so its old upload listener must also be removed.
         metrics_start = html.find('async function loadMetrics()', history_end)
         if metrics_start > history_end:
             html = html[:history_start] + HISTORY_FUNCTION + html[metrics_start:]
