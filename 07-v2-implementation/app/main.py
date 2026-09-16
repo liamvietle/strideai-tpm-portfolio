@@ -3,6 +3,7 @@ from __future__ import annotations
 import hmac
 import os
 
+import httpx
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
