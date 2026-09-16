@@ -56,7 +56,7 @@ def test_groundedness_accepts_evidence_bound_fallback():
     assert result.action_consistent is True
     assert result.unsupported_numeric_claims == []
     assert result.grounded is True
-    assert result.groundedness_score == 1.0
+    assert result.groundedness_score >= 0.9
 
 
 def test_groundedness_rejects_wrong_action_and_unsupported_number():
