@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from fastapi import HTTPException
+
 from app.accumulated_fatigue import evaluate_workout_v21
 from app.explanation import build_evidence_package, generate_explanation
 from app.models import AccumulatedWorkoutInput, RecoverySnapshot
@@ -81,7 +83,10 @@ def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWork
 
 def create_personal_recommendation(payload: DailyCheckInInput) -> PersonalRecommendationResponse:
     if _locked_checkin_exists(payload.athlete_id, payload.checkin_date):
-        raise ValueError("This morning decision is already locked. Record the outcome from History instead of regenerating it.")
+        raise HTTPException(
+            status_code=409,
+            detail="This morning decision is already locked. Record the outcome from History instead of regenerating it.",
+        )
 
     accumulated_input, calculated_load = build_accumulated_input(payload)
     checkin_id = upsert_checkin(payload, calculated_load_ratio=calculated_load)
