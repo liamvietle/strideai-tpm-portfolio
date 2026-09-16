@@ -17,8 +17,8 @@ from app.personal_storage import (
     init_personal_app_db,
     prior_checkins,
     upsert_checkin,
-    upsert_recovery_checkin,
 )
+from app.recovery_storage import upsert_recovery_day
 from app.retrieval import load_history, retrieve_similar_history
 from app.storage import connect, save_recommendation
 
@@ -87,7 +87,7 @@ def create_personal_recommendation(payload: DailyCheckInInput) -> PersonalRecomm
     if payload.planned_activity_type != PlannedActivityType.run:
         calculated_load = calculate_recent_load_ratio(payload.athlete_id, payload.checkin_date)
         try:
-            checkin_id = upsert_recovery_checkin(payload, calculated_load_ratio=calculated_load)
+            checkin_id = upsert_recovery_day(payload, calculated_load_ratio=calculated_load)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         label = "Rest day" if payload.planned_activity_type == PlannedActivityType.rest else payload.planned_activity_type.value.replace("_", " ").title()
