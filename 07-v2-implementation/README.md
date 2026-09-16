@@ -25,6 +25,7 @@ Implemented:
 - transparent retrieval of similar historical training cases
 - immutable evidence package passed to the explanation layer
 - optional OpenAI Responses API explanation generation
+- support for both convenience `output_text` and raw `output[].content[]` response shapes
 - deterministic explanation fallback when no API key is configured or the model call fails
 - guardrail that rejects an explanation if its declared action differs from the approved deterministic action
 - request trace containing provider, model, prompt version, latency, retrieval count, token usage, fallback status, and optional estimated cost
@@ -158,10 +159,11 @@ The Milestone 2 test suite covers:
 - deterministic fallback without an API key
 - rejection of an LLM attempt to change the approved action
 - acceptance of an action-consistent explanation
+- extraction of text from the raw Responses API payload shape
 - v1 API regression
 - v2 recommendation/evidence consistency
 
-Local validation before commit: **10 tests passed**.
+Local validation before commit: **11 tests passed**.
 
 ## Next milestone
 
