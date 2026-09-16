@@ -14,7 +14,8 @@ from app.storage import connect, init_db, upsert_activities
 
 STRAVA_AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
-STRAVA_ACTIVITIES_URL = "https://www.strava.com/api/v3/athlete/activities"
+STRAVA_API_BASE = "https://api-v3.strava.com"
+STRAVA_ACTIVITIES_URL = f"{STRAVA_API_BASE}/athlete/activities"
 
 
 def _client_id() -> str:
@@ -76,6 +77,7 @@ def strava_status(athlete_id: str = "viet") -> dict[str, object]:
         "scope": row.get("scope") if row else None,
         "last_sync_at": row.get("last_sync_at") if row else None,
         "token_expires_at": row.get("expires_at") if row else None,
+        "auto_sync": True,
     }
 
 
@@ -231,10 +233,16 @@ def _activity_record(athlete_id: str, activity: dict) -> ActivityRecord:
 
 
 def sync_strava_activities(athlete_id: str = "viet", *, max_pages: int = 2) -> dict[str, object]:
+    """Refresh recent Strava history, retaining all activity types.
+
+    Running load calculations remain run-specific; cross-training activities are
+    stored so later versions can model their contribution separately.
+    """
     row = _valid_connection(athlete_id)
     headers = {"Authorization": f"Bearer {row['access_token']}"}
     records: list[ActivityRecord] = []
     fetched = 0
+    running = 0
 
     for page in range(1, max_pages + 1):
         response = httpx.get(
@@ -249,9 +257,10 @@ def sync_strava_activities(athlete_id: str = "viet", *, max_pages: int = 2) -> d
             break
         fetched += len(batch)
         for activity in batch:
-            activity_type = str(activity.get("sport_type") or activity.get("type") or "")
-            if "run" in activity_type.lower():
-                records.append(_activity_record(athlete_id, activity))
+            record = _activity_record(athlete_id, activity)
+            records.append(record)
+            if "run" in record.activity_type.lower():
+                running += 1
         if len(batch) < 100:
             break
 
@@ -265,7 +274,8 @@ def sync_strava_activities(athlete_id: str = "viet", *, max_pages: int = 2) -> d
 
     return {
         "fetched": fetched,
-        "running_activities": len(records),
+        "activities": len(records),
+        "running_activities": running,
         "inserted": inserted,
         "updated": updated,
         "last_sync_at": synced_at,

@@ -65,6 +65,7 @@ def test_oauth_connection_and_activity_sync(monkeypatch, tmp_path):
     assert status["configured"] is True
     assert status["connected"] is True
     assert status["athlete_name"] == "Viet Le"
+    assert status["auto_sync"] is True
 
     activities = [
         {
@@ -103,18 +104,21 @@ def test_oauth_connection_and_activity_sync(monkeypatch, tmp_path):
 
     summary = sync_strava_activities("viet", max_pages=1)
     assert summary["fetched"] == 3
+    assert summary["activities"] == 3
     assert summary["running_activities"] == 2
-    assert summary["inserted"] == 2
+    assert summary["inserted"] == 3
 
     stored = list_activities("viet")
-    assert len(stored) == 2
-    assert {row["source_activity_id"] for row in stored} == {"1001", "1002"}
+    assert len(stored) == 3
+    assert {row["source_activity_id"] for row in stored} == {"1001", "1002", "1003"}
+    assert {row["activity_type"] for row in stored} == {"Run", "VirtualRun", "Ride"}
     assert all(row["source"] == "strava" for row in stored)
 
 
-def test_personal_app_injects_strava_controls():
+def test_personal_app_injects_strava_and_daily_controls():
     html = '<html><body><section id="data" class="panel"></section></body></html>'
     enhanced = enhance_personal_app(html)
     assert "Strava activity sync" in enhanced
     assert "connectStravaBtn" in enhanced
     assert "/app/api/strava/sync" in enhanced
+    assert "Automatic sync" in enhanced or "automatic" in enhanced.lower()
