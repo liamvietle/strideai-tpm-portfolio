@@ -5,6 +5,7 @@ from datetime import date
 from fastapi import HTTPException
 
 from app.accumulated_fatigue import evaluate_workout_v21
+from app.daily_checkin_v2 import PlannedActivityType
 from app.explanation import build_evidence_package, generate_explanation
 from app.models import AccumulatedWorkoutInput, RecoverySnapshot
 from app.observability import write_trace
@@ -16,6 +17,7 @@ from app.personal_storage import (
     init_personal_app_db,
     prior_checkins,
     upsert_checkin,
+    upsert_recovery_checkin,
 )
 from app.retrieval import load_history, retrieve_similar_history
 from app.storage import connect, save_recommendation
@@ -61,7 +63,7 @@ def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWork
             athlete_id=payload.athlete_id,
             day_index=_day_index(payload.checkin_date),
             planned_distance_km=payload.planned_distance_km,
-            planned_intensity=payload.planned_intensity,
+            planned_intensity=payload.planned_intensity or "easy",
             recent_load_ratio=effective_load,
             hrv_vs_baseline_pct=None,
             resting_hr_delta_bpm=None,
@@ -82,6 +84,20 @@ def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWork
 
 
 def create_personal_recommendation(payload: DailyCheckInInput) -> PersonalRecommendationResponse:
+    if payload.planned_activity_type != PlannedActivityType.run:
+        calculated_load = calculate_recent_load_ratio(payload.athlete_id, payload.checkin_date)
+        try:
+            checkin_id = upsert_recovery_checkin(payload, calculated_load_ratio=calculated_load)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        label = "Rest day" if payload.planned_activity_type == PlannedActivityType.rest else payload.planned_activity_type.value.replace("_", " ").title()
+        return PersonalRecommendationResponse(
+            mode="recovery_only_checkin",
+            checkin_id=checkin_id,
+            calculated_load_ratio=calculated_load,
+            message=f"{label} recovery check-in saved. It will contribute to your rolling recovery history for future running recommendations.",
+        )
+
     if _locked_checkin_exists(payload.athlete_id, payload.checkin_date):
         raise HTTPException(
             status_code=409,
