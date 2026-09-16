@@ -4,8 +4,13 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
+from app.daily_checkin_v2 import DailyRecoveryCheckInInput
 from app.personal_models import DailyCheckInInput
 from app.storage import connect, init_db
+
+
+def _column_names(conn, table: str) -> set[str]:
+    return {str(row["name"]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
 
 
 def init_personal_app_db(path: str | Path | None = None) -> None:
@@ -16,8 +21,8 @@ def init_personal_app_db(path: str | Path | None = None) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             athlete_id TEXT NOT NULL,
             checkin_date TEXT NOT NULL,
-            planned_distance_km REAL NOT NULL,
-            planned_intensity TEXT NOT NULL,
+            planned_distance_km REAL NOT NULL DEFAULT 0,
+            planned_intensity TEXT,
             sleep_hours REAL,
             hrv_ms REAL,
             hrv_baseline_low REAL,
@@ -28,9 +33,11 @@ def init_personal_app_db(path: str | Path | None = None) -> None:
             subjective_fatigue TEXT NOT NULL,
             recent_load_ratio REAL,
             days_until_event INTEGER,
-            human_decision TEXT NOT NULL,
+            human_decision TEXT,
             recommendation_id INTEGER,
             calculated_load_ratio REAL,
+            planned_activity_type TEXT NOT NULL DEFAULT 'run',
+            planned_activity_note TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(athlete_id, checkin_date)
@@ -38,6 +45,11 @@ def init_personal_app_db(path: str | Path | None = None) -> None:
         CREATE INDEX IF NOT EXISTS idx_daily_checkins_athlete_date
             ON daily_checkins(athlete_id, checkin_date);
         """)
+        columns = _column_names(conn, "daily_checkins")
+        if "planned_activity_type" not in columns:
+            conn.execute("ALTER TABLE daily_checkins ADD COLUMN planned_activity_type TEXT NOT NULL DEFAULT 'run'")
+        if "planned_activity_note" not in columns:
+            conn.execute("ALTER TABLE daily_checkins ADD COLUMN planned_activity_note TEXT")
 
 
 def upsert_checkin(
@@ -75,6 +87,7 @@ def upsert_checkin(
                     hrv_baseline_low=?, hrv_baseline_high=?, resting_hr_bpm=?, soreness_0_10=?,
                     pain_flag=?, subjective_fatigue=?, recent_load_ratio=?, days_until_event=?,
                     human_decision=?, calculated_load_ratio=?, recommendation_id=NULL,
+                    planned_activity_type='run', planned_activity_note=NULL,
                     updated_at=CURRENT_TIMESTAMP
                 WHERE id=?
             """, (*values, existing["id"]))
@@ -85,8 +98,9 @@ def upsert_checkin(
                 athlete_id, checkin_date, planned_distance_km, planned_intensity,
                 sleep_hours, hrv_ms, hrv_baseline_low, hrv_baseline_high,
                 resting_hr_bpm, soreness_0_10, pain_flag, subjective_fatigue,
-                recent_load_ratio, days_until_event, human_decision, calculated_load_ratio
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                recent_load_ratio, days_until_event, human_decision, calculated_load_ratio,
+                planned_activity_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'run')
         """, (
             payload.athlete_id,
             payload.checkin_date,
@@ -104,6 +118,68 @@ def upsert_checkin(
             payload.days_until_event,
             payload.human_decision.value,
             calculated_load_ratio,
+        ))
+        return int(cursor.lastrowid)
+
+
+def upsert_recovery_checkin(
+    payload: DailyRecoveryCheckInInput,
+    *,
+    calculated_load_ratio: Optional[float],
+    path: str | Path | None = None,
+) -> int:
+    """Store a rest/non-running day without generating a running recommendation."""
+    init_personal_app_db(path)
+    with connect(path) as conn:
+        existing = conn.execute(
+            "SELECT id, recommendation_id FROM daily_checkins WHERE athlete_id=? AND checkin_date=?",
+            (payload.athlete_id, payload.checkin_date),
+        ).fetchone()
+        if existing and existing["recommendation_id"] is not None:
+            raise ValueError("A running recommendation is already locked for this date.")
+
+        values = (
+            payload.planned_activity_type.value,
+            payload.planned_activity_note,
+            payload.planned_distance_km,
+            payload.planned_intensity,
+            payload.sleep_hours,
+            payload.hrv_ms,
+            payload.hrv_baseline_low,
+            payload.hrv_baseline_high,
+            payload.resting_hr_bpm,
+            payload.soreness_0_10,
+            int(payload.pain_flag),
+            payload.subjective_fatigue.value,
+            payload.recent_load_ratio,
+            payload.days_until_event,
+            calculated_load_ratio,
+        )
+        if existing:
+            conn.execute("""
+                UPDATE daily_checkins SET
+                    planned_activity_type=?, planned_activity_note=?, planned_distance_km=?,
+                    planned_intensity=?, sleep_hours=?, hrv_ms=?, hrv_baseline_low=?,
+                    hrv_baseline_high=?, resting_hr_bpm=?, soreness_0_10=?, pain_flag=?,
+                    subjective_fatigue=?, recent_load_ratio=?, days_until_event=?,
+                    calculated_load_ratio=?, human_decision=NULL, recommendation_id=NULL,
+                    updated_at=CURRENT_TIMESTAMP
+                WHERE id=?
+            """, (*values, existing["id"]))
+            return int(existing["id"])
+
+        cursor = conn.execute("""
+            INSERT INTO daily_checkins (
+                athlete_id, checkin_date, planned_activity_type, planned_activity_note,
+                planned_distance_km, planned_intensity, sleep_hours, hrv_ms,
+                hrv_baseline_low, hrv_baseline_high, resting_hr_bpm, soreness_0_10,
+                pain_flag, subjective_fatigue, recent_load_ratio, days_until_event,
+                calculated_load_ratio, human_decision
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        """, (
+            payload.athlete_id,
+            payload.checkin_date,
+            *values,
         ))
         return int(cursor.lastrowid)
 
@@ -159,7 +235,11 @@ def calculate_recent_load_ratio(
     checkin_date: str,
     path: str | Path | None = None,
 ) -> Optional[float]:
-    """7-day distance divided by 28-day weekly-average distance."""
+    """7-day running distance divided by 28-day weekly-average running distance.
+
+    Cross-training activities are stored but intentionally excluded until a
+    defensible cross-sport load model is introduced.
+    """
     init_personal_app_db(path)
     target = date.fromisoformat(checkin_date)
     start7 = (target - timedelta(days=7)).isoformat()
