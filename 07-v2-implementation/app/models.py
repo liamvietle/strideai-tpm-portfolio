@@ -62,3 +62,51 @@ class CoachingRecommendation(BaseModel):
     decision_factors: List[DecisionFactor]
     safety_flags: List[str]
     rules_version: str
+
+
+class HistoricalCase(BaseModel):
+    athlete_id: str
+    session_date: str
+    planned_intensity: str
+    factor_codes: List[str]
+    action: RecommendationAction
+    outcome: str
+
+
+class RetrievedCase(HistoricalCase):
+    similarity_score: float = Field(ge=0)
+
+
+class EvidencePackage(BaseModel):
+    athlete_id: str
+    planned_intensity: str
+    approved_action: RecommendationAction
+    volume_change_pct: int
+    fatigue_state: FatigueState
+    risk_level: RiskLevel
+    confidence: float
+    autonomy_mode: AutonomyMode
+    factor_details: List[str]
+    safety_flags: List[str]
+    retrieved_context: List[RetrievedCase]
+
+
+class ExplanationTrace(BaseModel):
+    request_id: str
+    provider: str
+    model: str
+    prompt_version: str
+    latency_ms: int = Field(ge=0)
+    retrieval_count: int = Field(ge=0)
+    guardrail_passed: bool
+    used_fallback: bool
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    estimated_cost_usd: Optional[float] = None
+
+
+class CoachingResponse(BaseModel):
+    recommendation: CoachingRecommendation
+    explanation: str
+    evidence: EvidencePackage
+    trace: ExplanationTrace
