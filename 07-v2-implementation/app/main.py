@@ -3,6 +3,7 @@ from __future__ import annotations
 import hmac
 import os
 
+import httpx
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
@@ -42,25 +43,34 @@ from app.storage import (
     save_recommendation,
     upsert_activities,
 )
+from app.strava_integration import (
+    complete_authorization,
+    create_authorization_url,
+    disconnect_strava,
+    init_strava_db,
+    strava_status,
+    sync_strava_activities,
+)
+from app.strava_ui import enhance_personal_app
 
 app = FastAPI(
     title="StrideAI",
-    version="1.0.0-personal",
-    description="Personal AI-assisted running coach with accumulated-recovery assessment, guarded explanations, outcome feedback, and real-world validation.",
+    version="1.1.0-personal",
+    description="Personal AI-assisted running coach with accumulated-recovery assessment, Strava activity sync, guarded explanations, outcome feedback, and real-world validation.",
 )
 
 APP_KEY = os.getenv("STRIDEAI_APP_KEY", "").strip()
+PUBLIC_PATHS = {"/", "/app", "/health", "/app/api/strava/callback"}
 
 
 @app.middleware("http")
 async def optional_personal_access_key(request: Request, call_next):
     """Protect personal data when STRIDEAI_APP_KEY is configured.
 
-    The app shell and health endpoint stay public so the browser can load and a
-    hosting provider can perform health checks. All API/data endpoints require
-    X-StrideAI-Key when a key is configured.
+    The app shell, health endpoint and OAuth callback stay public. The callback
+    is protected by a short-lived one-time OAuth state stored in SQLite.
     """
-    if APP_KEY and request.url.path not in {"/", "/app", "/health"}:
+    if APP_KEY and request.url.path not in PUBLIC_PATHS:
         supplied = request.headers.get("X-StrideAI-Key", "")
         if not hmac.compare_digest(supplied, APP_KEY):
             return JSONResponse(status_code=401, content={"detail": "StrideAI access key required."})
@@ -70,6 +80,7 @@ async def optional_personal_access_key(request: Request, call_next):
 @app.on_event("startup")
 def initialize() -> None:
     init_personal_app_db()
+    init_strava_db()
 
 
 @app.get("/", include_in_schema=False)
@@ -84,7 +95,7 @@ def health() -> dict[str, str]:
 
 @app.get("/app", response_class=HTMLResponse, include_in_schema=False)
 def personal_app() -> str:
-    return PERSONAL_APP_HTML
+    return enhance_personal_app(PERSONAL_APP_HTML)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -103,6 +114,52 @@ def personal_history(
     limit: int = Query(default=30, ge=1, le=365),
 ) -> list[dict]:
     return list_personal_history(athlete_id, limit=limit)
+
+
+@app.get("/app/api/strava/status")
+def get_strava_status(athlete_id: str = "viet") -> dict[str, object]:
+    return strava_status(athlete_id)
+
+
+@app.get("/app/api/strava/auth-url")
+def get_strava_auth_url(athlete_id: str = "viet") -> dict[str, str]:
+    try:
+        return {"url": create_authorization_url(athlete_id)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/app/api/strava/callback", include_in_schema=False)
+def strava_callback(
+    code: str | None = None,
+    state: str | None = None,
+    scope: str | None = None,
+    error: str | None = None,
+) -> RedirectResponse:
+    if error or not code or not state:
+        return RedirectResponse(url="/app?strava=denied")
+    try:
+        complete_authorization(code=code, state=state, scope=scope)
+    except Exception:
+        return RedirectResponse(url="/app?strava=error")
+    return RedirectResponse(url="/app?strava=connected")
+
+
+@app.post("/app/api/strava/sync")
+def sync_strava(athlete_id: str = "viet") -> dict[str, object]:
+    try:
+        return sync_strava_activities(athlete_id)
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code if exc.response is not None else 502
+        raise HTTPException(status_code=502, detail=f"Strava API returned HTTP {status}.") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.delete("/app/api/strava/connection")
+def remove_strava_connection(athlete_id: str = "viet") -> dict[str, bool]:
+    disconnect_strava(athlete_id)
+    return {"disconnected": True}
 
 
 @app.post("/v1/recommendations", response_model=CoachingRecommendation)
