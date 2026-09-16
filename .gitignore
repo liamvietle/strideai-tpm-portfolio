@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 .env
 07-v2-implementation/logs/*.jsonl
+07-v2-implementation/data/*.db
