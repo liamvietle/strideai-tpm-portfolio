@@ -4,17 +4,18 @@ StrideAI v1 documented the product, architecture, program-management approach, a
 
 > Deterministic logic makes the coaching decision; the LLM explains it.
 
-## Milestone 1: deterministic coaching API
+## Milestone progression
+
+### Milestone 1: deterministic coaching API
 
 - `POST /v1/recommendations`
 - structured Pydantic contracts
 - fatigue and risk rules
 - confidence-based autonomy
 - safety overrides
-- auditable decision factors
-- rules versioning
+- auditable decision factors and rules versioning
 
-## Milestone 2: retrieved context + guarded AI explanation
+### Milestone 2: retrieved context + guarded AI explanation
 
 - `POST /v2/recommendations`
 - retrieval of similar historical cases
@@ -23,37 +24,38 @@ StrideAI v1 documented the product, architecture, program-management approach, a
 - deterministic fallback
 - guardrail preventing the LLM from changing the approved action
 - request tracing for provider, model, prompt, latency, retrieval count, tokens, fallback, and optional cost
-- JSONL observability logs
 
 The LLM never owns or mutates the structured recommendation.
 
-## Milestone 3: real export ingestion + persistence + evaluation
-
-Milestone 3 adds the deployment plumbing needed to move from a demo request to an accumulating coaching system.
-
-Implemented:
+### Milestone 3: real export ingestion + persistence + evaluation
 
 - SQLite persistence for activities, recommendations, and outcomes
-- TCX ingestion compatible with exports from Garmin Connect and Strava
+- TCX ingestion compatible with Garmin Connect and Strava exports
 - Garmin activity-summary CSV ingestion
 - idempotent activity upserts
 - `POST /v3/recommendations` with persistent recommendation IDs
-- outcome capture for completed/rejected recommendations
-- activity import/list API endpoints
-- CLI import path for local exports
-- automated evaluation dataset and evaluation runner
+- outcome capture
 - Docker packaging
 - GitHub Actions CI
 
-### Why TCX is the primary activity adapter
+### Milestone 4: production feedback + quality gates
 
-Both Garmin Connect and Strava support TCX activity exports. TCX provides a structured activity representation and can include heart-rate data, which makes it a more reliable first integration contract than depending on changing spreadsheet column layouts.
+Milestone 4 turns post-deployment behavior into measurable signals.
 
-Garmin summary CSV is also supported for bulk activity summaries.
+Implemented:
 
-FIT ingestion is intentionally deferred. FIT is richer but binary and would add a separate dependency; TCX is enough to validate the ingestion and persistence architecture first.
+- persisted recommendation acceptance and override status
+- persisted explanation, evidence package, provider and guardrail metadata
+- deployment metrics for outcome coverage, acceptance, override, completion, pain-after, human review, guardrail pass and fallback
+- deterministic explanation-groundedness evaluation
+- unsupported numeric-claim detection
+- retrieval from prior persisted recommendation/outcome history
+- Milestone 3 regression baseline and automated release gate
+- `/v4/metrics`
+- `/v4/quality/explanations`
+- lightweight `/dashboard` operational view
 
-## Data flow
+## End-to-end data flow
 
 ```text
 Garmin / Strava export
@@ -62,36 +64,46 @@ Garmin / Strava export
 TCX / Garmin CSV parser
         |
         v
-Normalized ActivityRecord
-        |
-        v
 SQLite activity history
         |
-        +-------------------------------+
-        |                               |
-        v                               v
-Workout + recovery signals      prior recommendations/outcomes
-        |                               |
-        v                               |
-Deterministic decision engine           |
-        |                               |
-        v                               |
-Historical-context retrieval <----------+
+        v
+Workout + recovery signals
         |
         v
-Immutable evidence package
+Deterministic decision engine
         |
-        v
-Optional LLM explanation
-        |
-        v
-Action-consistency guardrail
-        |
-        v
-Persistent recommendation + trace
-        |
-        v
-User outcome / override
+        +------------------------------+
+        |                              |
+        v                              v
+static reference cases      persisted recommendations + outcomes
+        |                              |
+        +--------------+---------------+
+                       v
+              historical retrieval
+                       |
+                       v
+              immutable evidence
+                       |
+                       v
+              LLM explanation
+                       |
+                       v
+              action guardrail
+                       |
+                       v
+       persistent recommendation + trace
+                       |
+                       v
+            user outcome / override
+                       |
+          +------------+-------------+
+          |                          |
+          v                          v
+  deployment metrics       explanation quality
+          |                          |
+          +------------+-------------+
+                       v
+              regression / release gate
 ```
 
 ## Run locally
@@ -110,21 +122,23 @@ Swagger UI:
 http://127.0.0.1:8000/docs
 ```
 
-Run tests:
+Operational dashboard:
+
+```text
+http://127.0.0.1:8000/dashboard
+```
+
+Run tests and evaluation gates:
 
 ```bash
 pytest -q
-```
-
-Run the deterministic evaluation suite:
-
-```bash
 python -m app.evaluation evaluation/cases.json
+python -m app.quality evaluation/cases.json evaluation/baseline-m3.json
 ```
 
-## Import a real TCX activity
+## Real activity ingestion
 
-Garmin Connect and Strava can both export an activity as TCX.
+Import a Garmin or Strava TCX file locally:
 
 ```bash
 python -m app.import_cli \
@@ -134,17 +148,7 @@ python -m app.import_cli \
   --source garmin
 ```
 
-For a Strava TCX export:
-
-```bash
-python -m app.import_cli \
-  --file /path/to/activity.tcx \
-  --athlete-id viet \
-  --format tcx \
-  --source strava
-```
-
-Import a Garmin activity-list CSV:
+Import a Garmin activity-summary CSV:
 
 ```bash
 python -m app.import_cli \
@@ -153,128 +157,108 @@ python -m app.import_cli \
   --format garmin-csv
 ```
 
-No personal raw activity export is committed to this public repository. Real exports should remain local or be sanitized before sharing.
+No personal raw activity export is committed to this public repository.
 
-## v3 API
+## Outcome feedback
 
-Import TCX:
-
-```text
-POST /v3/activities/import/tcx?athlete_id=viet&source=garmin
-```
-
-Import Garmin CSV:
-
-```text
-POST /v3/activities/import/garmin-csv?athlete_id=viet
-```
-
-List persisted activities:
-
-```text
-GET /v3/activities?athlete_id=viet
-```
-
-Create and persist an explained recommendation:
-
-```text
-POST /v3/recommendations
-```
-
-Record the observed outcome:
-
-```text
-PUT /v3/recommendations/{recommendation_id}/outcome
-```
-
-## Persistence
-
-The default database is:
-
-```text
-data/strideai.db
-```
-
-Override it with:
-
-```bash
-export STRIDEAI_DB_PATH=/path/to/strideai.db
-```
-
-The database stores three separate layers:
-
-1. raw-normalized activity history,
-2. recommendation requests and deterministic outputs,
-3. observed user outcomes.
-
-This separation allows later evaluation of recommendation quality and user overrides without rewriting historical source data.
-
-## Evaluation
-
-`evaluation/cases.json` is a small deterministic regression set. It currently measures:
-
-- expected-action accuracy,
-- safety violations,
-- cases routed to human review.
-
-The dataset is intentionally small and synthetic at this stage. It validates the evaluation pipeline; it does not claim clinical or coaching accuracy.
-
-Example output:
+An outcome can now distinguish completing a session from actually following StrideAI's recommendation:
 
 ```json
 {
-  "cases": 6,
-  "correct_actions": 6,
-  "action_accuracy": 1.0,
-  "safety_violations": 0,
-  "human_review_cases": 4
+  "completed": true,
+  "perceived_effort_0_10": 6,
+  "pain_after": false,
+  "followed_recommendation": false,
+  "override_action": "reduce_volume",
+  "notes": "Reduced the session, but not as much as recommended."
 }
 ```
 
-## Docker
+This separation avoids treating missing follow/override feedback as implicit acceptance.
 
-Build:
+## Deployment metrics
+
+```text
+GET /v4/metrics?athlete_id=viet
+```
+
+The response includes:
+
+- outcome coverage
+- recommendation acceptance and override rates
+- completion and pain-after rates
+- average perceived effort
+- human-review rate
+- trace coverage
+- guardrail pass rate
+- deterministic-fallback rate
+- average explanation latency
+
+Metrics expose their own coverage instead of hiding missing feedback.
+
+## Explanation groundedness
+
+```text
+GET /v4/quality/explanations?athlete_id=viet
+```
+
+The first quality evaluator is intentionally deterministic rather than another LLM judge. It checks:
+
+1. the explanation still declares the approved deterministic action,
+2. numeric claims are present in the evidence package,
+3. the explanation overlaps with the actual decision factors.
+
+The resulting groundedness score is a regression signal, not a claim of medical or coaching correctness.
+
+## Persisted outcome retrieval
+
+Milestone 2 used a static reference-case file. Milestone 4 also converts completed recommendation/outcome records into `HistoricalCase` objects. New persisted recommendations can therefore retrieve relevant prior outcomes using the same transparent similarity scoring used for reference cases.
+
+Only records with an observed outcome enter this persisted-history source.
+
+## Regression gate
+
+`evaluation/baseline-m3.json` captures the Milestone 3 deterministic baseline. CI compares the current candidate against it and fails if:
+
+- action accuracy falls by more than 2 percentage points,
+- safety violations increase,
+- explanation groundedness falls below 90%, or
+- explanation action consistency falls below 99%.
+
+The current hand-authored evaluation set is intentionally small. It demonstrates deployment discipline and release gating; it does not prove real-world coaching accuracy.
+
+## Docker
 
 ```bash
 docker build -t strideai-v2 .
-```
-
-Run:
-
-```bash
 docker run --rm -p 8000:8000 \
   -v "$(pwd)/data:/app/data" \
   -e OPENAI_API_KEY="$OPENAI_API_KEY" \
   strideai-v2
 ```
 
-The application works without an OpenAI API key; the explanation layer falls back deterministically.
+The application still works without an OpenAI API key by using deterministic explanation fallback.
 
 ## CI
 
-`.github/workflows/strideai-v2-ci.yml` runs on changes to the v2 implementation and executes:
+`.github/workflows/strideai-v2-ci.yml` runs:
 
 1. dependency installation,
-2. the pytest suite,
-3. the deterministic evaluation runner.
+2. the full pytest suite,
+3. deterministic action/safety evaluation,
+4. the Milestone 4 deployment-quality regression gate.
 
 ## Current limitations
 
-- raw Garmin wellness FIT data such as HRV/sleep is not yet ingested
-- TCX activities provide workout history, but daily recovery signals still enter the recommendation API separately
-- historical retrieval still uses the Milestone 2 reference-case store rather than querying learned similarity from the SQLite history
-- evaluation cases are small and hand-authored
-- no user-facing UI yet
+- raw Garmin wellness FIT data such as HRV and sleep is not yet ingested
+- daily recovery signals still enter the recommendation API separately
+- the persisted-history retriever uses transparent rule-based similarity rather than embeddings
+- the evaluation set is small and hand-authored
+- outcome metrics become representative only after enough user feedback is captured
+- deterministic groundedness checks catch obvious unsupported claims but are not full semantic verification
 
 These are deliberate boundaries rather than hidden gaps.
 
 ## Next milestone
 
-Milestone 4 should focus on measurable AI quality rather than adding more product surface:
-
-1. generate evaluation cases from persisted history,
-2. score explanation groundedness and action consistency,
-3. track human overrides and recommendation acceptance,
-4. retrieve from persisted recommendations/outcomes,
-5. add a minimal dashboard for traces, evaluations, and outcomes,
-6. optionally add FIT/wellness ingestion for HRV and sleep.
+The next useful step is not more infrastructure. It is to validate the system with a real private activity export and grow the evaluation set from observed failure/override cases. After that, semantic retrieval and richer model-based evaluation would have enough data to justify their complexity.
