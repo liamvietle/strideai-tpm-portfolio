@@ -29,3 +29,5 @@ jobs:
       - run: python -m app.evaluation evaluation/cases.json
       - name: Run deployment quality regression gate
         run: python -m app.quality evaluation/cases.json evaluation/baseline-m3.json
+      - name: Run sanitized real-world accumulated-fatigue validation
+        run: python -m app.real_validation evaluation/real-validation-sanitized.json
