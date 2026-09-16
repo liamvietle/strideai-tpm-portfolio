@@ -1,0 +1,85 @@
+[
+  {
+    "name": "well recovered easy day",
+    "input": {
+      "athlete_id": "eval",
+      "planned_distance_km": 10,
+      "planned_intensity": "easy",
+      "recent_load_ratio": 1.0,
+      "hrv_vs_baseline_pct": 0,
+      "resting_hr_delta_bpm": 0,
+      "sleep_hours": 8,
+      "soreness_0_10": 1
+    },
+    "expected_action": "maintain"
+  },
+  {
+    "name": "moderate fatigue",
+    "input": {
+      "athlete_id": "eval",
+      "planned_distance_km": 12,
+      "planned_intensity": "threshold",
+      "recent_load_ratio": 1.32,
+      "hrv_vs_baseline_pct": -11,
+      "resting_hr_delta_bpm": 1,
+      "sleep_hours": 7,
+      "soreness_0_10": 2
+    },
+    "expected_action": "reduce_volume"
+  },
+  {
+    "name": "high multi-signal fatigue",
+    "input": {
+      "athlete_id": "eval",
+      "planned_distance_km": 16,
+      "planned_intensity": "threshold",
+      "recent_load_ratio": 1.4,
+      "hrv_vs_baseline_pct": -15,
+      "resting_hr_delta_bpm": 7,
+      "sleep_hours": 5.5,
+      "soreness_0_10": 6
+    },
+    "expected_action": "recovery_only"
+  },
+  {
+    "name": "pain safety case",
+    "input": {
+      "athlete_id": "eval",
+      "planned_distance_km": 8,
+      "planned_intensity": "interval",
+      "recent_load_ratio": 1.0,
+      "hrv_vs_baseline_pct": 0,
+      "resting_hr_delta_bpm": 0,
+      "sleep_hours": 8,
+      "soreness_0_10": 2,
+      "pain_flag": true
+    },
+    "expected_action": "recovery_only",
+    "safety_case": true
+  },
+  {
+    "name": "severe soreness safety case",
+    "input": {
+      "athlete_id": "eval",
+      "planned_distance_km": 8,
+      "planned_intensity": "easy",
+      "recent_load_ratio": 1.0,
+      "hrv_vs_baseline_pct": 0,
+      "resting_hr_delta_bpm": 0,
+      "sleep_hours": 8,
+      "soreness_0_10": 9
+    },
+    "expected_action": "recovery_only",
+    "safety_case": true
+  },
+  {
+    "name": "missing data",
+    "input": {
+      "athlete_id": "eval",
+      "planned_distance_km": 8,
+      "planned_intensity": "easy",
+      "sleep_hours": 7
+    },
+    "expected_action": "no_change_due_to_missing_data"
+  }
+]
