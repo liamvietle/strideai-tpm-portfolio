@@ -1,109 +1,120 @@
 # StrideAI v2 Implementation
 
-StrideAI v1 documented the product, architecture, program-management approach, and AI evaluation strategy. StrideAI v2 converts that design into running software while preserving one core rule:
+StrideAI v2 converts the original TPM/architecture case study into working software while preserving one core rule:
 
 > Deterministic logic makes the coaching decision; the LLM explains it.
 
 ## Milestone progression
 
-### Milestone 1: deterministic coaching API
+### Milestone 1 — deterministic coaching API
 
 - `POST /v1/recommendations`
 - structured Pydantic contracts
-- fatigue and risk rules
+- fatigue/risk rules
 - confidence-based autonomy
-- safety overrides
-- auditable decision factors and rules versioning
+- hard safety overrides
+- auditable decision factors and rule versions
 
-### Milestone 2: retrieved context + guarded AI explanation
+### Milestone 2 — retrieval + guarded AI explanation
 
 - `POST /v2/recommendations`
-- retrieval of similar historical cases
+- transparent historical retrieval
 - immutable evidence package
 - optional OpenAI Responses API explanation generation
 - deterministic fallback
-- guardrail preventing the LLM from changing the approved action
-- request tracing for provider, model, prompt, latency, retrieval count, tokens, fallback, and optional cost
+- action-consistency guardrail
+- latency/token/fallback observability
 
 The LLM never owns or mutates the structured recommendation.
 
-### Milestone 3: real export ingestion + persistence + evaluation
+### Milestone 3 — real export ingestion + persistence
 
 - SQLite persistence for activities, recommendations, and outcomes
-- TCX ingestion compatible with Garmin Connect and Strava exports
+- TCX ingestion for Garmin Connect and Strava exports
 - Garmin activity-summary CSV ingestion
-- idempotent activity upserts
-- `POST /v3/recommendations` with persistent recommendation IDs
-- outcome capture
+- idempotent imports
+- `POST /v3/recommendations`
 - Docker packaging
 - GitHub Actions CI
 
-### Milestone 4: production feedback + quality gates
+### Milestone 4 — production feedback + quality gates
 
-Milestone 4 turns post-deployment behavior into measurable signals.
+- recommendation acceptance and override status
+- outcome coverage, completion, pain-after, human-review, guardrail and fallback metrics
+- deterministic explanation-groundedness checks
+- persisted recommendation/outcome retrieval
+- regression baseline and release gate
+- `/v4/metrics`
+- `/v4/quality/explanations`
+- lightweight `/dashboard`
+
+### Milestone 5 — accumulated recovery debt + real validation
+
+Milestone 5 came from a real retrospective validation sequence rather than a planned infrastructure feature.
+
+The initial comparison made StrideAI look too conservative because the athlete maintained most sessions while the engine repeatedly warned about poor recovery. A later below-expectation target event changed the interpretation: the athlete judged those earlier warnings as directionally useful in hindsight.
+
+That led to a new v2.1 model that distinguishes an isolated warning from accumulating fatigue.
 
 Implemented:
 
-- persisted recommendation acceptance and override status
-- persisted explanation, evidence package, provider and guardrail metadata
-- deployment metrics for outcome coverage, acceptance, override, completion, pain-after, human review, guardrail pass and fallback
-- deterministic explanation-groundedness evaluation
-- unsupported numeric-claim detection
-- retrieval from prior persisted recommendation/outcome history
-- Milestone 3 regression baseline and automated release gate
-- `/v4/metrics`
-- `/v4/quality/explanations`
-- lightweight `/dashboard` operational view
+- `POST /v5/recommendations`
+- accumulated-fatigue states: `low`, `elevated`, `high`, `critical`
+- 3-day and 7-day observed recovery windows
+- repeated low-sleep detection
+- HRV comparison against the wearable's actual baseline range instead of a range midpoint
+- recent HRV trend
+- recent resting-HR rise
+- load, subjective fatigue, soreness and event-proximity contributors
+- single bad night can warn without automatically cutting training
+- only pain/severe soreness can force `recovery_only`
+- sanitized real validation sequence with separate contemporaneous and hindsight labels
+- outcome-aligned warning metric
+- real-validation gate in CI
 
-## End-to-end data flow
+See [Milestone 5 — Real Validation and Accumulated Recovery Debt](MILESTONE-5-REAL-VALIDATION.md).
+
+## v5 decision flow
 
 ```text
-Garmin / Strava export
+Current recovery snapshot
+        +
+recent recovery observations
         |
         v
-TCX / Garmin CSV parser
+Observed 3-day / 7-day windows
+        |
+        +--> repeated short sleep
+        +--> HRV baseline position
+        +--> HRV trend
+        +--> resting-HR change
+        +--> load / subjective fatigue / soreness
+        +--> event proximity
         |
         v
-SQLite activity history
+Accumulated fatigue assessment
+        |
+        +--> LOW      -> maintain
+        +--> ELEVATED -> warn / usually maintain
+        +--> HIGH     -> reduce intensity
+        +--> CRITICAL -> reduce volume / human review
+        |
+        +--> pain or severe soreness -> recovery only
         |
         v
-Workout + recovery signals
+Historical retrieval
         |
         v
-Deterministic decision engine
+Immutable evidence package
         |
-        +------------------------------+
-        |                              |
-        v                              v
-static reference cases      persisted recommendations + outcomes
-        |                              |
-        +--------------+---------------+
-                       v
-              historical retrieval
-                       |
-                       v
-              immutable evidence
-                       |
-                       v
-              LLM explanation
-                       |
-                       v
-              action guardrail
-                       |
-                       v
-       persistent recommendation + trace
-                       |
-                       v
-            user outcome / override
-                       |
-          +------------+-------------+
-          |                          |
-          v                          v
-  deployment metrics       explanation quality
-          |                          |
-          +------------+-------------+
-                       v
-              regression / release gate
+        v
+Guarded LLM explanation
+        |
+        v
+Persistent recommendation + trace
+        |
+        v
+Observed outcome / override
 ```
 
 ## Run locally
@@ -128,13 +139,52 @@ Operational dashboard:
 http://127.0.0.1:8000/dashboard
 ```
 
-Run tests and evaluation gates:
+## Example v5 request
 
-```bash
-pytest -q
-python -m app.evaluation evaluation/cases.json
-python -m app.quality evaluation/cases.json evaluation/baseline-m3.json
+```json
+{
+  "athlete_id": "local-athlete",
+  "day_index": 12,
+  "planned_distance_km": 12,
+  "planned_intensity": "moderate",
+  "recent_load_ratio": 1.35,
+  "sleep_hours": 4.5,
+  "soreness_0_10": 2,
+  "pain_flag": false,
+  "hrv_ms": 48,
+  "hrv_baseline_low": 46,
+  "hrv_baseline_high": 77,
+  "resting_hr_bpm": 52,
+  "subjective_fatigue": "slightly_tired",
+  "days_until_event": 3,
+  "recovery_history": [
+    {
+      "day_index": 10,
+      "sleep_hours": 5.0,
+      "hrv_ms": 55,
+      "hrv_baseline_low": 46,
+      "hrv_baseline_high": 77,
+      "resting_hr_bpm": 48,
+      "soreness_0_10": 1,
+      "subjective_fatigue": "normal",
+      "recent_load_ratio": 1.2
+    },
+    {
+      "day_index": 11,
+      "sleep_hours": 4.0,
+      "hrv_ms": 51,
+      "hrv_baseline_low": 46,
+      "hrv_baseline_high": 77,
+      "resting_hr_bpm": 50,
+      "soreness_0_10": 1,
+      "subjective_fatigue": "normal",
+      "recent_load_ratio": 1.3
+    }
+  ]
+}
 ```
+
+`day_index` is an arbitrary monotonic day number. It allows rolling-window evaluation without requiring calendar dates in validation fixtures.
 
 ## Real activity ingestion
 
@@ -143,7 +193,7 @@ Import a Garmin or Strava TCX file locally:
 ```bash
 python -m app.import_cli \
   --file /path/to/activity.tcx \
-  --athlete-id viet \
+  --athlete-id local-athlete \
   --format tcx \
   --source garmin
 ```
@@ -153,112 +203,73 @@ Import a Garmin activity-summary CSV:
 ```bash
 python -m app.import_cli \
   --file /path/to/activities.csv \
-  --athlete-id viet \
+  --athlete-id local-athlete \
   --format garmin-csv
 ```
 
 No personal raw activity export is committed to this public repository.
 
-## Outcome feedback
+## Real-validation labels
 
-An outcome can now distinguish completing a session from actually following StrideAI's recommendation:
+The sanitized validation set keeps three concepts separate:
 
-```json
-{
-  "completed": true,
-  "perceived_effort_0_10": 6,
-  "pain_after": false,
-  "followed_recommendation": false,
-  "override_action": "reduce_volume",
-  "notes": "Reduced the session, but not as much as recommended."
-}
-```
+1. **human action at the time** — what the athlete chose that morning,
+2. **StrideAI output** — what the deterministic system recommended,
+3. **outcome-informed assessment** — whether later evidence suggested the earlier warning had directional value.
 
-This separation avoids treating missing follow/override feedback as implicit acceptance.
+The third label is retrospective judgment, not causal proof.
 
-## Deployment metrics
-
-```text
-GET /v4/metrics?athlete_id=viet
-```
-
-The response includes:
-
-- outcome coverage
-- recommendation acceptance and override rates
-- completion and pain-after rates
-- average perceived effort
-- human-review rate
-- trace coverage
-- guardrail pass rate
-- deterministic-fallback rate
-- average explanation latency
-
-Metrics expose their own coverage instead of hiding missing feedback.
-
-## Explanation groundedness
-
-```text
-GET /v4/quality/explanations?athlete_id=viet
-```
-
-The first quality evaluator is intentionally deterministic rather than another LLM judge. It checks:
-
-1. the explanation still declares the approved deterministic action,
-2. numeric claims are present in the evidence package,
-3. the explanation overlaps with the actual decision factors.
-
-The resulting groundedness score is a regression signal, not a claim of medical or coaching correctness.
-
-## Persisted outcome retrieval
-
-Milestone 2 used a static reference-case file. Milestone 4 also converts completed recommendation/outcome records into `HistoricalCase` objects. New persisted recommendations can therefore retrieve relevant prior outcomes using the same transparent similarity scoring used for reference cases.
-
-Only records with an observed outcome enter this persisted-history source.
-
-## Regression gate
-
-`evaluation/baseline-m3.json` captures the Milestone 3 deterministic baseline. CI compares the current candidate against it and fails if:
-
-- action accuracy falls by more than 2 percentage points,
-- safety violations increase,
-- explanation groundedness falls below 90%, or
-- explanation action consistency falls below 99%.
-
-The current hand-authored evaluation set is intentionally small. It demonstrates deployment discipline and release gating; it does not prove real-world coaching accuracy.
-
-## Docker
+Run it with:
 
 ```bash
-docker build -t strideai-v2 .
-docker run --rm -p 8000:8000 \
-  -v "$(pwd)/data:/app/data" \
-  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
-  strideai-v2
+python -m app.real_validation evaluation/real-validation-sanitized.json
 ```
 
-The application still works without an OpenAI API key by using deterministic explanation fallback.
+The main new metric is `outcome_aligned_warning_rate`. This is intentionally reported alongside exact contemporaneous agreement rather than replacing it.
 
-## CI
+## Existing deployment metrics
 
-`.github/workflows/strideai-v2-ci.yml` runs:
+```text
+GET /v4/metrics?athlete_id=local-athlete
+GET /v4/quality/explanations?athlete_id=local-athlete
+```
 
-1. dependency installation,
-2. the full pytest suite,
-3. deterministic action/safety evaluation,
-4. the Milestone 4 deployment-quality regression gate.
+Metrics include coverage, acceptance, override, completion, pain-after, human review, guardrail pass, fallback and explanation latency.
+
+## Tests and release gates
+
+```bash
+pytest -q
+python -m app.evaluation evaluation/cases.json
+python -m app.quality evaluation/cases.json evaluation/baseline-m3.json
+python -m app.real_validation evaluation/real-validation-sanitized.json
+```
+
+CI fails if the deterministic baseline regresses materially, safety violations increase, explanation quality falls below the existing gate, or the sanitized real-validation sequence loses most of its outcome-aligned warning detection.
+
+## Privacy boundary
+
+`evaluation/real-validation-sanitized.json` is **not** a raw wearable export. Calendar dates and identity are removed, sleep is rounded, HRV levels are transformed while preserving baseline relationships/trends, and resting-HR levels are shifted while preserving deltas.
 
 ## Current limitations
 
-- raw Garmin wellness FIT data such as HRV and sleep is not yet ingested
-- daily recovery signals still enter the recommendation API separately
-- the persisted-history retriever uses transparent rule-based similarity rather than embeddings
-- the evaluation set is small and hand-authored
-- outcome metrics become representative only after enough user feedback is captured
-- deterministic groundedness checks catch obvious unsupported claims but are not full semantic verification
+- raw Garmin wellness FIT data such as HRV and sleep is not ingested automatically
+- the real-validation set has sparse recovery observations rather than every calendar day
+- retrospective outcome labels are useful for product learning but are vulnerable to hindsight bias
+- accumulated-fatigue thresholds are heuristics, not medically validated cutoffs
+- rule-based retrieval is still used instead of embeddings
+- the real-validation sample is small
 
-These are deliberate boundaries rather than hidden gaps.
+These are explicit boundaries rather than hidden gaps.
 
-## Next milestone
+## Next step
 
-The next useful step is not more infrastructure. It is to validate the system with a real private activity export and grow the evaluation set from observed failure/override cases. After that, semantic retrieval and richer model-based evaluation would have enough data to justify their complexity.
+The next step is **prospective validation**, not another infrastructure milestone:
+
+1. record recovery signals before a future training session,
+2. lock the athlete's independent decision,
+3. reveal the v5 recommendation,
+4. record the actual session and subsequent outcome,
+5. analyze disagreements without rewriting the original labels.
+
+A growing prospective failure/override set is more valuable now than adding agents, Kubernetes, or a vector database.

@@ -1,11 +1,13 @@
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse
 
+from app.accumulated_fatigue import evaluate_workout_v21
 from app.dashboard import DASHBOARD_HTML
 from app.engine import evaluate_workout
 from app.explanation import build_evidence_package, generate_explanation
 from app.ingestion import parse_garmin_summary_csv, parse_tcx
 from app.models import (
+    AccumulatedWorkoutInput,
     CoachingRecommendation,
     CoachingResponse,
     DeploymentMetrics,
@@ -14,6 +16,7 @@ from app.models import (
     OutcomeInput,
     PersistedCoachingResponse,
     StoredActivity,
+    V5CoachingResponse,
     WorkoutInput,
 )
 from app.observability import write_trace
@@ -32,8 +35,8 @@ from app.storage import (
 
 app = FastAPI(
     title="StrideAI v2",
-    version="0.4.0",
-    description="Persistent AI coaching deployment with outcome feedback, quality gates, and operational metrics.",
+    version="0.5.0",
+    description="Persistent AI coaching with accumulated-recovery assessment, guarded explanations, outcome feedback, and quality gates.",
 )
 
 
@@ -87,6 +90,32 @@ def create_v3_recommendation(payload: WorkoutInput) -> PersistedCoachingResponse
     )
     return PersistedCoachingResponse(
         **response.model_dump(),
+        recommendation_id=recommendation_id,
+    )
+
+
+@app.post("/v5/recommendations", response_model=V5CoachingResponse)
+def create_v5_recommendation(payload: AccumulatedWorkoutInput) -> V5CoachingResponse:
+    init_db()
+    recommendation, accumulated_fatigue = evaluate_workout_v21(payload)
+    history = [*load_history(), *load_persisted_history(payload.athlete_id)]
+    retrieved = retrieve_similar_history(payload, recommendation, history=history)
+    evidence = build_evidence_package(payload, recommendation, retrieved)
+    explanation, trace = generate_explanation(evidence)
+    write_trace(trace, athlete_id=payload.athlete_id, approved_action=recommendation.action)
+    recommendation_id = save_recommendation(
+        payload,
+        recommendation,
+        trace,
+        explanation=explanation,
+        evidence=evidence,
+    )
+    return V5CoachingResponse(
+        recommendation=recommendation,
+        accumulated_fatigue=accumulated_fatigue,
+        explanation=explanation,
+        evidence=evidence,
+        trace=trace,
         recommendation_id=recommendation_id,
     )
 

@@ -1,204 +1,141 @@
-# StrideAI — AI Adaptive Coaching Technical Program Case Study
+# StrideAI — AI Coaching Deployment and Technical Program Portfolio
 
-Viet Le | Technical Program Manager
+Viet Le | Technical Program / AI Deployment Portfolio
 
-How would I lead the launch of an AI system where recommendation quality, safety, and uncertainty directly affect user behavior?
+StrideAI began as a TPM case study for launching an adaptive running coach. It has since evolved into a working portfolio implementation covering deterministic decision logic, guarded LLM explanations, real activity ingestion, persistence, observability, outcome feedback, release gates, and real-world validation.
 
-StrideAI is a simulated AI running-coach program designed to demonstrate how I approach complex technical programs across Product, Engineering, Data Science, QA, and Platform.
+The project is designed to answer a practical deployment question:
 
-What this case study demonstrates:
+> How do you build, deploy, evaluate, and improve an AI-assisted workflow when recommendation quality, uncertainty, safety, and user behavior all matter?
 
-- Product → technical requirements
-- Architecture → executable program
-- AI evaluation → launch gates
-- Risk → mitigation → executive decision
-- Controlled rollout → evidence-based scaling
+## What the project demonstrates
 
----
-
-## Executive summary
-
-StrideAI is an adaptive AI running coach for recreational runners from 5K through marathon.
-
-The product's core differentiation is **continuous training adaptation** using:
-
-- Performance data
-- Recovery signals
-- Wearable data
-- Training load
-- Real-world conditions such as weather
-
-The central program challenge is balancing **AI recommendation quality, safety, technical complexity, launch timing, and engineering capacity**.
-
-### My program recommendation
-
-Protect the commercial launch through **controlled exposure** while protecting the quality bar through explicit evidence-based gates:
-
-**Internal → Beta → 20% → 40% → 100%**
-
----
-
-## What this case study demonstrates
-
-| Area | Demonstrated capability |
+| Area | Evidence in the repository |
 |---|---|
-| Product strategy | MVP prioritization and differentiation |
-| Technical program management | Roadmap, critical path, dependencies |
-| Architecture | AI system design and technical trade-offs |
-| AI governance | Model evaluation and quality gates |
-| Risk management | RAID, mitigation and escalation |
-| Executive communication | Concise status and decision recommendations |
-| Launch management | Controlled rollout and rollback |
+| Product strategy | MVP definition, trade-offs, rollout design |
+| Technical program management | backlog, RAID, dependencies, milestones |
+| Architecture | deterministic decision layer, retrieval, guarded LLM explanation |
+| AI deployment | FastAPI service, persistence, Docker, CI |
+| AI evaluation | safety tests, groundedness checks, regression gates |
+| Real data | Garmin/Strava-compatible ingestion and sanitized real validation |
+| Human-in-the-loop | confidence, human review, override/outcome capture |
+| Production learning | adoption metrics, failure analysis, accumulated-fatigue iteration |
 
 ---
 
-## Product strategy
+## Core architecture principle
 
-### Target users
+**Deterministic logic makes the coaching decision; the LLM explains it.**
 
-Recreational runners ranging from 5K to marathon.
-
-### Product positioning
-
-> **The smartest adaptive running coach for everyday runners.**
-
-### MVP priorities
-
-1. Wearable synchronization
-2. Training-load assessment
-3. Recovery/fatigue assessment
-4. Confidence-based adaptation
-5. Safety rules
-6. Recommendation explanation
-
-Secondary features such as race prediction, weekly summaries and advanced progress tracking are deferred to protect the core differentiator.
-
----
-
-## Technical architecture
-
-![StrideAI architecture](docs/images/architecture.svg)
+Safety-critical behavior remains predictable, testable and auditable. The LLM receives an evidence package containing the already-approved action and cannot replace the structured recommendation. Invalid or inconsistent model output falls back to a deterministic explanation.
 
 ```mermaid
 flowchart TD
-    A[Runner / Mobile App] --> B[API Gateway]
-    B --> C[Wearable Integration]
-    C --> D[Message Queue]
-    D --> E[Data Processing]
-    E --> F[Training Load]
-    E --> G[Recovery Signals]
-    F --> H[Fatigue Model]
-    G --> H
-    H --> I[Confidence Engine]
-    I --> J[Adaptation Engine]
-    J --> K[Safety Rules]
-    K --> L[Final Recommendation]
-    L --> M[LLM Explanation]
-    L --> N[(Recommendation Store)]
-    M --> A
-    N --> A
+    A[Workout + recovery signals] --> B[Deterministic decision logic]
+    B --> C[Historical retrieval]
+    C --> D[Immutable evidence package]
+    D --> E[Optional LLM explanation]
+    E --> F[Action-consistency guardrail]
+    F --> G[Recommendation + trace]
+    G --> H[(SQLite persistence)]
+    H --> I[Outcome / override]
+    I --> J[Metrics + evaluation]
+    J --> K[Regression / release gate]
 ```
 
-### Key architecture decision
+---
 
-**ML/deterministic logic makes the core coaching decision; the LLM explains it.**
+## Evolution from case study to working system
 
-The reasoning is that safety-critical adaptation needs to be predictable, testable, observable and auditable. The LLM adds value through natural-language explanation without independently inventing safety-critical behavior.
+### v1 — program and architecture design
+
+The original portfolio established:
+
+- product strategy and MVP scope,
+- system architecture and ADRs,
+- six-week delivery plan,
+- Jira-style backlog and RAID log,
+- AI evaluation framework,
+- controlled rollout and rollback approach,
+- executive status communication.
+
+### v2 Milestone 1 — deterministic API
+
+- FastAPI recommendation endpoint
+- structured input/output models
+- fatigue/risk rules
+- safety overrides
+- confidence-based autonomy
+- automated tests
+
+### v2 Milestone 2 — guarded AI explanation
+
+- historical-context retrieval
+- immutable evidence package
+- optional OpenAI Responses API explanation
+- deterministic fallback
+- action-consistency guardrail
+- latency/token/fallback tracing
+
+### v2 Milestone 3 — real data and persistence
+
+- Garmin/Strava TCX ingestion
+- Garmin activity-summary CSV ingestion
+- SQLite storage for activities, recommendations and outcomes
+- Docker packaging
+- GitHub Actions CI
+
+### v2 Milestone 4 — deployment quality loop
+
+- recommendation acceptance and override metrics
+- outcome coverage and completion metrics
+- explanation groundedness checks
+- unsupported numeric-claim detection
+- persisted outcome retrieval
+- regression/release gates
+- lightweight operational dashboard
+
+### v2 Milestone 5 — accumulated recovery debt
+
+Real retrospective validation exposed a more interesting problem than simple threshold tuning: the system needed to distinguish one poor recovery day from a sustained deterioration pattern.
+
+Milestone 5 adds:
+
+- 3-day and 7-day observed recovery windows,
+- repeated short-sleep detection,
+- HRV position against the wearable's actual baseline range,
+- HRV trend and resting-HR rise,
+- subjective fatigue and event proximity,
+- accumulated-fatigue states,
+- sanitized real validation,
+- separate contemporaneous-vs-hindsight evaluation labels,
+- outcome-aligned warning measurement.
+
+A single bad night can create a warning without forcing a training change. Repeated poor recovery can escalate the recommendation. Pain and severe soreness remain hard safety overrides.
+
+See the working implementation in [`07-v2-implementation`](07-v2-implementation/README.md).
 
 ---
 
-## Program execution
+## Real-validation learning
 
-### Six-week MVP plan
+The first real validation sequence initially appeared to show that StrideAI was too conservative because the athlete repeatedly chose to maintain training.
 
-| Week | Primary focus |
-|---|---|
-| 1 | Architecture, API integration, schemas |
-| 2 | Data ingestion and first end-to-end slice |
-| 3 | Training load, recovery and fatigue model |
-| 4 | Adaptation, safety and explanation |
-| 5 | Integration, performance and monitoring |
-| 6 | Internal beta and controlled rollout |
+A later below-expectation target event changed the interpretation. The athlete judged the earlier recovery warnings as directionally useful in hindsight, suggesting that **exact agreement with the athlete's morning decision is not enough to evaluate an AI coach**.
 
-### Critical path
+The project therefore keeps three concepts separate:
 
-**Wearable integration → validated data → fatigue model → confidence → safety → adaptation → mobile → launch**
+1. the athlete's decision at the time,
+2. StrideAI's recommendation,
+3. the later outcome-informed assessment.
 
-A key milestone is the end of Week 2:
+This does not prove causality or coaching efficacy. It demonstrates how production evidence can change a product hypothesis without rewriting the original labels.
 
-> One real workout should flow through the system end-to-end and produce a basic recommendation.
+The public validation fixture is sanitized and transformed; raw wearable history and exact personal biometrics are not committed.
 
 ---
 
-## Major program risk
-
-At the Week 3 checkpoint, assume recommendation quality is **74%** against an **80% production target**.
-
-At the same time, delaying the announced launch could jeopardize a major commercial partnership.
-
-Rather than choosing between an unconditional launch and a full schedule delay, the recommended strategy is:
-
-**Internal → Beta → 20% → 40% → 100%**
-
-Each expansion requires explicit quality, safety and reliability gates.
-
----
-
-## Controlled rollout
-
-Scenario assumption: Internal → Beta → 20% → 40% → 100%. Each stage requires explicit quality, safety and reliability gates before expanding exposure, with predefined rollback criteria.
-
-![StrideAI rollout](docs/images/rollout.svg)
-
-## AI evaluation framework
-
-"AI accuracy" is not treated as one universal metric.
-
-Quality is evaluated across four layers:
-
-### 1. Model quality
-- Precision
-- Recall
-- F1
-- Calibration
-- False-positive / false-negative rates
-
-### 2. Recommendation quality
-- Expert evaluation
-- Historical backtesting
-- Decision-quality analysis
-
-### 3. Safety
-- Critical safety violation rate
-- Safety test coverage
-- Low-confidence automatic adaptation
-
-### 4. User outcomes
-- Recommendation acceptance
-- Override rate
-- Satisfaction
-- Retention
-- Training adherence
-
-A critical safety violation is treated as a separate, much stricter gate than general recommendation quality.
-
----
-
-## Program governance
-
-The case study includes:
-
-- Jira-style MVP backlog
-- RAID log
-- Dependency management
-- Architecture Decision Records
-- AI quality gates
-- Rollout / rollback criteria
-- Executive weekly status
-
----
-
-## Portfolio artifacts
+## Repository structure
 
 ### Product
 - [Product strategy](01-product/product-strategy.md)
@@ -215,15 +152,21 @@ The case study includes:
 - [Jira-style backlog](03-program-management/jira-backlog.md)
 - [RAID log](03-program-management/raid-log.md)
 
-### AI
-- [AI evaluation framework](04-ai-evaluation/evaluation-framework.md)
+### AI evaluation
+- [Evaluation framework](04-ai-evaluation/evaluation-framework.md)
 
 ### Executive communication
 - [Executive weekly status](05-executive/executive-status.md)
 - [Executive presentation](presentation/StrideAI-Executive-Portfolio-Deck.pptx)
 
+### Working implementation
+- [StrideAI v2 implementation](07-v2-implementation/README.md)
+- [Milestone 5 real-validation design](07-v2-implementation/MILESTONE-5-REAL-VALIDATION.md)
+
 ---
 
-## Disclaimer
+## Current validation boundary
 
-StrideAI is a simulated case study and is not a production product or prior employment project.
+StrideAI is a portfolio project, not a production coaching or medical system. The current rules and accumulated-fatigue thresholds are heuristics. The real-validation sample is small and retrospective.
+
+The next evidence step is prospective validation: record recovery signals and the athlete's independent decision first, reveal the StrideAI recommendation second, and then capture the actual workout and subsequent outcome without changing the original labels.
