@@ -1,5 +1,5 @@
 from app.engine import evaluate_workout
-from app.explanation import build_evidence_package, generate_explanation, validate_explanation
+from app.explanation import _extract_output_text, build_evidence_package, generate_explanation, validate_explanation
 from app.models import RecommendationAction, WorkoutInput
 
 
@@ -76,3 +76,20 @@ def test_guardrail_accepts_matching_action():
         "The current fatigue signals support the approved adjustment."
     )
     assert validate_explanation(text, evidence.approved_action) is True
+
+
+def test_extracts_text_from_raw_responses_api_shape():
+    payload = {
+        "output": [
+            {
+                "type": "message",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": "Approved action: maintain. Keep the plan unchanged.",
+                    }
+                ],
+            }
+        ]
+    }
+    assert _extract_output_text(payload) == "Approved action: maintain. Keep the plan unchanged."
