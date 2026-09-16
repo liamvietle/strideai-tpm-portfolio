@@ -104,11 +104,6 @@ STRAVA_SCRIPT = r'''
       if(button.dataset.tab==='today'&&Date.now()-lastAutoSync>5*60*1000)loadStravaStatus({auto:true});
     });
   });
-  document.addEventListener('submit',async event=>{
-    if(event.target.id==='checkinForm'&&Date.now()-lastAutoSync>5*60*1000){
-      try{await loadStravaStatus({auto:true})}catch{}
-    }
-  },true);
   const params=new URLSearchParams(window.location.search);
   if(params.get('strava')==='connected'){
     const dataButton=document.querySelector('.nav button[data-tab="data"]');
