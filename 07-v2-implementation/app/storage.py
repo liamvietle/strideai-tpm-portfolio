@@ -16,7 +16,7 @@ from app.models import (
     WorkoutInput,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def db_path() -> Path:
@@ -64,6 +64,15 @@ def init_db(path: str | Path | None = None) -> None:
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(source, source_activity_id, athlete_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS activity_weather (
+            activity_id INTEGER PRIMARY KEY,
+            fingerprint TEXT NOT NULL,
+            status TEXT NOT NULL,
+            weather_json TEXT,
+            attempted_at REAL NOT NULL,
+            FOREIGN KEY(activity_id) REFERENCES activities(id)
         );
 
         CREATE TABLE IF NOT EXISTS recommendations (
