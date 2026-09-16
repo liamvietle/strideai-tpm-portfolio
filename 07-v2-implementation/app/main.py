@@ -17,8 +17,9 @@ from app.models import (
     WorkoutInput,
 )
 from app.observability import write_trace
+from app.persisted_history import load_persisted_history
 from app.quality import summarize_explanation_records
-from app.retrieval import retrieve_similar_history
+from app.retrieval import load_history, retrieve_similar_history
 from app.storage import (
     get_deployment_metrics,
     init_db,
@@ -51,10 +52,13 @@ def create_v1_recommendation(payload: WorkoutInput) -> CoachingRecommendation:
     return evaluate_workout(payload)
 
 
-def _create_v2_response(payload: WorkoutInput) -> CoachingResponse:
+def _create_v2_response(payload: WorkoutInput, *, include_persisted_history: bool = False) -> CoachingResponse:
     recommendation = evaluate_workout(payload)
-    history = retrieve_similar_history(payload, recommendation)
-    evidence = build_evidence_package(payload, recommendation, history)
+    history = None
+    if include_persisted_history:
+        history = [*load_history(), *load_persisted_history(payload.athlete_id)]
+    retrieved = retrieve_similar_history(payload, recommendation, history=history)
+    evidence = build_evidence_package(payload, recommendation, retrieved)
     explanation, trace = generate_explanation(evidence)
     write_trace(trace, athlete_id=payload.athlete_id, approved_action=recommendation.action)
     return CoachingResponse(
@@ -72,8 +76,8 @@ def create_v2_recommendation(payload: WorkoutInput) -> CoachingResponse:
 
 @app.post("/v3/recommendations", response_model=PersistedCoachingResponse)
 def create_v3_recommendation(payload: WorkoutInput) -> PersistedCoachingResponse:
-    response = _create_v2_response(payload)
     init_db()
+    response = _create_v2_response(payload, include_persisted_history=True)
     recommendation_id = save_recommendation(
         payload,
         response.recommendation,
