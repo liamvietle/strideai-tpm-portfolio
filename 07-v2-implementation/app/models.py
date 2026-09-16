@@ -110,3 +110,53 @@ class CoachingResponse(BaseModel):
     explanation: str
     evidence: EvidencePackage
     trace: ExplanationTrace
+
+
+class ActivityRecord(BaseModel):
+    source: str
+    source_activity_id: str
+    athlete_id: str
+    start_time: str
+    activity_type: str
+    name: Optional[str] = None
+    distance_km: Optional[float] = Field(default=None, ge=0)
+    duration_seconds: Optional[int] = Field(default=None, ge=0)
+    average_hr: Optional[float] = Field(default=None, ge=0)
+    max_hr: Optional[float] = Field(default=None, ge=0)
+    calories: Optional[float] = Field(default=None, ge=0)
+    raw_format: str
+    raw_payload: Optional[str] = None
+
+
+class ImportSummary(BaseModel):
+    source: str
+    format: str
+    parsed: int
+    inserted: int
+    updated: int
+    skipped: int
+
+
+class OutcomeInput(BaseModel):
+    completed: bool
+    perceived_effort_0_10: Optional[int] = Field(default=None, ge=0, le=10)
+    pain_after: bool = False
+    notes: Optional[str] = None
+
+
+class EvaluationSummary(BaseModel):
+    cases: int
+    correct_actions: int
+    action_accuracy: float
+    safety_violations: int
+    human_review_cases: int
+
+
+class StoredActivity(ActivityRecord):
+    id: int
+    created_at: str
+    updated_at: str
+
+
+class PersistedCoachingResponse(CoachingResponse):
+    recommendation_id: int
