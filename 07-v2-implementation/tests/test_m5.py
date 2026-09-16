@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
 
+from fastapi.testclient import TestClient
+
 from app.accumulated_fatigue import assess_accumulated_fatigue, evaluate_workout_v21
+from app.main import app
 from app.models import (
     AccumulatedFatigueState,
     AccumulatedWorkoutInput,
@@ -89,6 +92,23 @@ def test_sanitized_real_sequence_detects_outcome_aligned_warning():
     assert summary.missed_deterioration <= 1
     assert summary.action_changes >= 5
     assert summary.human_agreement_rate < 1.0
+
+
+def test_v5_endpoint_persists_accumulated_fatigue_response(monkeypatch, tmp_path):
+    monkeypatch.setenv("STRIDEAI_DB_PATH", str(tmp_path / "v5.db"))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    client = TestClient(app)
+
+    payload = _input(sleep_hours=3.0).model_dump(mode="json")
+    response = client.post("/v5/recommendations", json=payload)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["recommendation_id"] >= 1
+    assert body["recommendation"]["action"] == "maintain"
+    assert body["accumulated_fatigue"]["state"] == "elevated"
+    assert body["accumulated_fatigue"]["has_warning"] is True
+    assert body["trace"]["used_fallback"] is True
 
 
 def test_real_validation_file_contains_no_calendar_dates():
