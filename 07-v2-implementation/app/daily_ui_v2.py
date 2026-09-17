@@ -111,7 +111,7 @@ EXTRA_SCRIPT = r'''
 def enhance_daily_ui(html: str) -> str:
     html = html.replace(
         '<div class="field"><label>Date</label><input id="checkin_date" type="date" required></div>\n          <div class="field"><label>Planned distance (km)</label><input id="planned_distance_km" type="number" min="0.1" max="100" step="0.1" required></div>',
-        '<div class="field"><label>Date</label><input id="checkin_date" type="date" required></div>\n          <div class="field"><label>Planned activity</label><select id="planned_activity_type"><option value="run">Run</option><option value="rest">Rest / recovery day</option><option value="strength">Strength</option><option value="cycling">Cycling</option><option value="tennis">Tennis</option><option value="football">Football</option><option value="other">Other</option></select></div>\n          <div class="field"><label>Planned distance (km)</label><input id="planned_distance_km" type="number" min="0.1" max="300" step="0.1" required></div>',
+        '<div class="field"><label>Date</label><input id="checkin_date" type="date" required></div>\n          <div class="field"><label>Planned activity</label><select id="planned_activity_type"><option value="run">Run</option><option value="rest">Rest / recovery day</option><option value="strength">Strength</option><option value="cycling">Cycling</option><option value="tennis">Tennis</option><option value="football">Football</option><option value="other">Other</option></select></div>\n          <div class="field"><label>Planned distance (km)</label><input id="planned_distance_km" type="number" min="0.1" max="300" step="any" required></div>',
         1,
     )
     html = html.replace(
