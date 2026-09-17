@@ -20,6 +20,7 @@ def list_personal_history(
                 c.*,
                 r.recommendation_json,
                 r.explanation,
+                w.weather_json,
                 o.completed,
                 o.perceived_effort_0_10,
                 o.pain_after,
@@ -28,6 +29,7 @@ def list_personal_history(
                 o.notes AS outcome_notes
             FROM daily_checkins c
             LEFT JOIN recommendations r ON r.id=c.recommendation_id
+            LEFT JOIN run_weather_decisions w ON w.recommendation_id=c.recommendation_id
             LEFT JOIN outcomes o ON o.recommendation_id=c.recommendation_id
             WHERE c.athlete_id=?
             ORDER BY c.checkin_date DESC
@@ -45,6 +47,7 @@ def list_personal_history(
             except json.JSONDecodeError:
                 recommendation = None
         row["recommendation"] = recommendation
+        row['run_weather'] = json.loads(row.pop('weather_json') or 'null')
         for key in ("pain_flag", "completed", "pain_after", "followed_recommendation"):
             if row.get(key) is not None:
                 row[key] = bool(row[key])

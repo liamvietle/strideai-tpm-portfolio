@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import json
 
 from fastapi import HTTPException
 
@@ -21,6 +22,7 @@ from app.personal_storage import (
 from app.recovery_storage import upsert_recovery_day
 from app.retrieval import load_history, retrieve_similar_history
 from app.storage import connect, save_recommendation
+from app.run_weather import forecast_guidance
 
 
 def _day_index(checkin_date: str) -> int:
@@ -108,6 +110,9 @@ def create_personal_recommendation(payload: DailyCheckInInput) -> PersonalRecomm
     checkin_id = upsert_checkin(payload, calculated_load_ratio=calculated_load)
 
     recommendation, accumulated_fatigue = evaluate_workout_v21(accumulated_input)
+    weather = forecast_guidance(payload.run_weather)
+    if recommendation.action.value == 'recovery_only':
+        weather['guidance'] = 'Follow recovery-only advice; a cooler forecast does not override pain or recovery concerns. ' + weather['guidance']
     history = [*load_history(), *load_persisted_history(payload.athlete_id)]
     retrieved = retrieve_similar_history(accumulated_input, recommendation, history=history)
     evidence = build_evidence_package(accumulated_input, recommendation, retrieved)
@@ -121,8 +126,11 @@ def create_personal_recommendation(payload: DailyCheckInInput) -> PersonalRecomm
         evidence=evidence,
     )
     attach_recommendation(checkin_id, recommendation_id)
+    with connect() as conn:
+        conn.execute('INSERT INTO run_weather_decisions VALUES (?,?)', (recommendation_id, json.dumps(weather)))
 
     return PersonalRecommendationResponse(
+        run_weather=weather,
         recommendation=recommendation,
         accumulated_fatigue=accumulated_fatigue,
         explanation=explanation,

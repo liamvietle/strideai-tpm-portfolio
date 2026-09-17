@@ -5,6 +5,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, model_validator
 
 from app.daily_checkin_v2 import PlannedActivityType
+from app.run_weather import RunWeatherInput
 from app.models import (
     AccumulatedFatigueAssessment,
     CoachingRecommendation,
@@ -16,6 +17,7 @@ from app.models import (
 
 
 class DailyCheckInInput(BaseModel):
+    run_weather: Optional[RunWeatherInput] = None
     athlete_id: str = Field(default="viet", min_length=1)
     checkin_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     planned_activity_type: PlannedActivityType = PlannedActivityType.run
@@ -36,6 +38,10 @@ class DailyCheckInInput(BaseModel):
 
     @model_validator(mode="after")
     def validate_session(self):
+        from datetime import date
+        date.fromisoformat(self.checkin_date)
+        if self.run_weather and not self.run_weather.indoor and self.run_weather.start.date().isoformat() != self.checkin_date:
+            raise ValueError('Forecast start date must match the check-in date.')
         if self.planned_activity_type == PlannedActivityType.run:
             if self.planned_distance_km <= 0:
                 raise ValueError("Running check-ins require a planned distance greater than 0 km.")
@@ -59,6 +65,7 @@ class DailyCheckInRecord(DailyCheckInInput):
 
 
 class PersonalRecommendationResponse(BaseModel):
+    run_weather: Optional[dict] = None
     mode: str = "recommendation"
     checkin_id: int
     human_decision: Optional[RecommendationAction] = None
