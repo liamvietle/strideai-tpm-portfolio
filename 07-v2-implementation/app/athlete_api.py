@@ -11,11 +11,22 @@ from app import athlete_store as store
 from app.athlete_coach import decide, evaluate, execute, predict
 from app.athlete_learning import health_points, learn
 from app.athlete_models import Decision, Execution, GeneratePlan
-from app.athlete_planning import generate
+from app.athlete_planning import generate, plan_setup
+from app.race_prediction import race_prediction
 from app.storage import connect
 from app.training_plan import get_goal
 
 router = APIRouter(prefix="/app/api/coach", tags=["Athlete loop"])
+
+
+@router.get('/plan-setup')
+def setup_plan(athlete_id: str = 'viet'):
+    return plan_setup(athlete_id)
+
+
+@router.get('/race-prediction')
+def forecast_race(athlete_id: str = 'viet'):
+    return race_prediction(athlete_id)
 
 
 @router.get("/profile")

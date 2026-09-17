@@ -61,6 +61,18 @@ def targets(p, kind, easy_pace, km):
     }
 
 
+def plan_setup(athlete):
+    goal = get_goal(athlete)
+    if not goal:
+        raise HTTPException(409, "Save a target race first.")
+    today = store.today(athlete)
+    finish = date.fromisoformat(goal['race_date'])
+    weeks = 16 if goal['distance_km'] >= 40 else 12 if goal['distance_km'] >= 20 else 10 if goal['distance_km'] >= 9 else 8
+    return {'today': today.isoformat(), 'race_date': finish.isoformat(), 'recommended_weeks': weeks,
+            'recommended_start': max(today, finish - timedelta(weeks=weeks) + timedelta(days=1)).isoformat(),
+            'note': 'Suggested duration is a starting heuristic, not a guarantee of race readiness. A short window does not justify cramming training.'}
+
+
 def generate(payload, athlete):
     p = store.profile(athlete)
     goal = get_goal(athlete)
@@ -68,7 +80,18 @@ def generate(payload, athlete):
         raise HTTPException(
             409, "Save a target race first. Your profile can remain incomplete."
         )
-    start, finish = payload.start_date, date.fromisoformat(goal["race_date"])
+    finish = date.fromisoformat(goal["race_date"])
+    today = store.today(athlete)
+    start = payload.start_date
+    if payload.start_mode == 'today':
+        start = today
+    elif payload.start_mode == 'next_monday':
+        start = today + timedelta(days=7 - today.weekday())
+    elif payload.start_mode == 'recommended':
+        weeks = payload.duration_weeks or plan_setup(athlete)['recommended_weeks']
+        start = max(today, finish - timedelta(weeks=weeks) + timedelta(days=1))
+    if start is None:
+        raise HTTPException(422, 'Choose a start date or start option.')
     if start < store.today(athlete) or not 0 < (finish - start).days <= 365:
         raise HTTPException(
             422, "Start today or later, with a race within the following 365 days."
@@ -103,8 +126,9 @@ def generate(payload, athlete):
         km = 0
         phase = "taper" if remaining < 14 else ("base" if week < 3 else "build")
         if d.weekday() in days and baseline > 0 and d != finish:
-            long_day = days[-1]
-            key_day = days[0] if len(days) >= 4 else None
+            long_day = p.long_run_day if p.long_run_day is not None else days[-1]
+            candidates = [day for day in days if min((day-long_day)%7, (long_day-day)%7) >= 2]
+            key_day = min(candidates, key=lambda day: abs((long_day-day)%7-3)) if len(days) >= 4 and candidates else None
             kind = "long" if d.weekday() == long_day and len(days) >= 3 else "easy"
             if (
                 d.weekday() == key_day
@@ -178,6 +202,10 @@ def generate(payload, athlete):
                 rpe_target=None,
                 instructions="Your finish-time goal is an aspiration. Review recent training and recovery before choosing a race effort.",
             )
+        w['strength_session'] = bool(p.include_strength and d.weekday() in p.strength_days and remaining >= 7 and not p.active_injury)
+        w['strength_minutes'] = min(30, max(0, p.max_session_minutes - w['duration_minutes'])) if w['strength_session'] else 0
+        w['strength_session'] = w['strength_minutes'] >= 10
+        w['strength_instructions'] = 'Optional familiar runner-strength exercises at comfortable effort; stop with pain. Omitted in race week and during active injury.' if w['strength_session'] else None
         result.append(w)
     with connect() as c:
         c.execute("BEGIN IMMEDIATE")
@@ -233,6 +261,8 @@ def generate(payload, athlete):
         athlete,
     )
     return {
+        'start_date': start.isoformat(),
+        'duration_weeks': ((finish-start).days + 7)//7,
         "workouts": len(result),
         "baseline_weekly_km": round(baseline, 1),
         "assumptions": [

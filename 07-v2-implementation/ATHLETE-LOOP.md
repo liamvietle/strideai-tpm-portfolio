@@ -102,3 +102,20 @@ The new suite covers partial profiles, plan bounds, cold starts, the full loop, 
 - Existing app-key access is a single-user gate, not multi-tenant authentication.
 
 The mobile browser smoke test is `tests/browser_smoke.cjs`. With Playwright and Chromium installed, start the app against a fresh temporary database at `127.0.0.1:8765`, then run `node tests/browser_smoke.cjs`. Optional `CHROMIUM_EXECUTABLE` points to an installed Chromium. It exercises profile → race → plan → check-in → prediction → acceptance → execution/evaluation → review at 390 px width, rejects coach API errors/JavaScript errors and checks horizontal overflow. Do not run it against a real athlete database.
+# Combined calendar and forecast additions
+
+The existing athlete loop remains authoritative. Optional `long_run_day`,
+`include_strength`, and `strength_days` extend its profile JSON without replacing
+existing profiles or locked workouts. Strength supplements respect the session
+time cap and are omitted during active injury and race week.
+
+Plan generation supports custom, today, next-Monday and recommended starts, with
+an optional 1–32 week race-specific block for the recommended start option.
+`GET /app/api/coach/plan-setup` returns the suggested duration and date.
+
+`GET /app/api/coach/race-prediction` exposes a provisional race-equivalence
+estimate from dated PBs within 180 days. Newer performances replace stale anchors.
+Daily snapshots use the additive `coach_race_forecasts` table. The displayed range
+is heuristic, not calibrated. Workout completion alone does not change the time
+estimate; evaluated workouts continue to feed the existing athlete-learning loop.
+No extra environment variables are required.
