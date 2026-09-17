@@ -75,6 +75,11 @@ def init_db(path: str | Path | None = None) -> None:
             FOREIGN KEY(activity_id) REFERENCES activities(id)
         );
 
+        CREATE TABLE IF NOT EXISTS run_weather_decisions (
+            recommendation_id INTEGER PRIMARY KEY,
+            weather_json TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS recommendations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             athlete_id TEXT NOT NULL,

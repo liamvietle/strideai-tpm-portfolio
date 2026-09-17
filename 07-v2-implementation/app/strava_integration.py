@@ -14,7 +14,7 @@ from app.storage import connect, init_db, upsert_activities
 
 STRAVA_AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
-STRAVA_API_BASE = "https://api-v3.strava.com"
+STRAVA_API_BASE = "https://www.strava.com/api/v3"
 STRAVA_ACTIVITIES_URL = f"{STRAVA_API_BASE}/athlete/activities"
 
 

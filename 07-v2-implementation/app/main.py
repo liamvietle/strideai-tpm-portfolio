@@ -53,6 +53,9 @@ from app.strava_integration import (
     sync_strava_activities,
 )
 from app.strava_ui import enhance_personal_app
+from app.training_plan import RaceGoal, PlanImport, get_goal, save_goal, save_plan, plan_progress
+from app.run_weather import RunWeatherInput, find_places, forecast_guidance
+from app.plan_ui import enhance_plan_ui
 
 app = FastAPI(
     title="StrideAI",
@@ -96,7 +99,35 @@ def health() -> dict[str, str]:
 
 @app.get("/app", response_class=HTMLResponse, include_in_schema=False)
 def personal_app() -> str:
-    return enhance_personal_app(PERSONAL_APP_HTML)
+    return enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML))
+
+
+@app.get('/app/api/plan')
+def get_training_progress(athlete_id: str = 'viet'):
+    return plan_progress(athlete_id)
+
+
+@app.put('/app/api/goal')
+def update_race_goal(payload: RaceGoal, athlete_id: str = 'viet'):
+    return save_goal(payload, athlete_id)
+
+
+@app.post('/app/api/plan')
+def import_training_plan(payload: PlanImport, athlete_id: str = 'viet'):
+    return save_plan(payload, athlete_id)
+
+
+@app.get('/app/api/weather/places')
+def weather_places(name: str = Query(min_length=2, max_length=100)):
+    try:
+        return find_places(name)
+    except (httpx.HTTPError, ValueError, KeyError):
+        raise HTTPException(503, 'Location search unavailable. Please try again.')
+
+
+@app.post('/app/api/weather/forecast')
+def next_run_forecast(payload: RunWeatherInput):
+    return forecast_guidance(payload)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -155,6 +186,8 @@ def sync_strava(background_tasks: BackgroundTasks, athlete_id: str = "viet") -> 
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code if exc.response is not None else 502
         raise HTTPException(status_code=502, detail=f"Strava API returned HTTP {status}.") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail='Strava could not be reached. Your saved data is unchanged; try syncing again shortly.') from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

@@ -146,6 +146,44 @@ These boundaries keep the product useful without prematurely turning a personal 
 
 ## Recent activities and weather
 
+## Race planning and next-run forecast guidance
+
+Plan stores an editable race goal and append-only plan snapshots in private SQLite
+tables. Starting a new race archives the previous goal without deleting its plan.
+Snapshots are imported through the authenticated API or the Plan editor; this is
+not a live Google Sheets connection. Do not commit personal schedules to GitHub.
+Weekly totals compare the snapshot with recorded Strava runs on each activity's
+local date. Missing activities remain unknown. Daily detail distinguishes the
+original plan, the check-in distance, the recovery recommendation and recorded
+distance. Three reductions in 14 days prompt review; this is a product heuristic,
+not a finish-time prediction or an instruction to make up mileage. Race goals are
+never revised automatically.
+
+Today can fetch a forecast for a selected city and upcoming start (within seven
+days). A city search and forecast transmit the selected city/coordinates and date
+to Open-Meteo. The containing UTC hour is matched exactly. Optional guidance is
+saved with the recommendation and appears in Plan daily detail. Indoor runs skip
+weather. Missing/failed forecasts are explicit and do not imply safe conditions.
+Recovery scoring, fixed volume cuts and safety gates remain unchanged. The
+separate forecast layer advises easy effort at apparent temperature >=30 C and a
+cooler time/indoor session at >=38 C. These are provisional product heuristics,
+not validated physiological cutoffs or WBGT categories. It does not apply an
+additional mileage percentage or infer tomorrow's location from past activities.
+
+Evidence supports monitoring and adaptation, not this exact combined algorithm:
+- IOC heat consensus: https://pmc.ncbi.nlm.nih.gov/articles/PMC9811094/
+- Vesterinen et al. HRV-guided training: https://pubmed.ncbi.nlm.nih.gov/26909534/
+- Saw et al. subjective monitoring review: https://pubmed.ncbi.nlm.nih.gov/26423706/
+- Walsh et al. sleep consensus: https://researchonline.ljmu.ac.uk/id/eprint/16297/
+- ACWR methodological critique: https://pubmed.ncbi.nlm.nih.gov/32502973/
+
+Deployment requires a real mounted Railway volume at /app/data, not just a
+STRIDEAI_DB_PATH variable. Verify the mount in service status and deployment logs
+before redeploying, and verify data counts across a deployment. No backup is
+implied by the existence of a persistent volume.
+
+## Recent activity weather details
+
 Data > Recent Activities shows the newest 30 synced Strava activities, including
 non-running activities. Activity times use the browser's local time zone. Missing
 metrics are omitted, not shown as zero. Running cadence converts Strava's cycle
