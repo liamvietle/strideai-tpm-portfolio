@@ -273,3 +273,8 @@ The next step is **prospective validation**, not another infrastructure mileston
 5. analyze disagreements without rewriting the original labels.
 
 A growing prospective failure/override set is more valuable now than adding agents, Kubernetes, or a vector database.
+
+
+## Athlete coaching loop
+
+The Athlete, Coach and Review tabs add profile-based planning, saved pre-run expectations, execution/outcome comparisons, bounded athlete learning and living-plan revisions. See [ATHLETE-LOOP.md](ATHLETE-LOOP.md) for the workflow, additive migration, AI configuration and current limitations.

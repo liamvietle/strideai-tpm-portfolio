@@ -5,7 +5,7 @@ PLAN_PANEL = r'''
  <form id="goalForm"><div class="grid">
  <div class="field"><label for="raceName">Race name</label><input id="raceName" maxlength="120" required></div>
  <div class="field"><label for="raceDate">Race date</label><input id="raceDate" type="date" required></div>
- <div class="field"><label for="raceDistance">Distance (km)</label><input id="raceDistance" type="number" min="0.1" max="300" step="0.001" value="42.195" required></div>
+ <div class="field"><label for="raceDistance">Distance (km)</label><input id="raceDistance" type="number" min="0.1" max="300" step="any" value="42.195" required></div>
  <div class="field"><label for="raceTime">Finish-time goal (HH:MM)</label><input id="raceTime" placeholder="03:50" pattern="[0-9]{1,3}:[0-5][0-9]" required></div>
  <div class="field"><label for="planTimezone">Training time zone</label><input id="planTimezone" value="Asia/Ho_Chi_Minh" required></div>
  <div class="checks"><label><input id="newRace" type="checkbox"> Start a new race and plan</label></div>

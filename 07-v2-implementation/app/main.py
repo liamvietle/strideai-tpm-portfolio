@@ -57,12 +57,17 @@ from app.strava_ui import enhance_personal_app
 from app.training_plan import RaceGoal, PlanImport, get_goal, save_goal, save_plan, plan_progress
 from app.run_weather import RunWeatherInput, find_places, forecast_guidance
 from app.plan_ui import enhance_plan_ui
+from app.athlete_api import router as athlete_router
+from app.athlete_store import init_athlete_db
+from app.athlete_ui import enhance_athlete_ui
 
 app = FastAPI(
     title="StrideAI",
     version="1.1.0-personal",
     description="Personal AI-assisted running coach with accumulated-recovery assessment, Strava activity sync, guarded explanations, outcome feedback, and real-world validation.",
 )
+
+app.include_router(athlete_router)
 
 APP_KEY = os.getenv("STRIDEAI_APP_KEY", "").strip()
 PUBLIC_PATHS = {"/", "/app", "/privacy", "/health", "/app/api/strava/callback"}
@@ -86,6 +91,7 @@ async def optional_personal_access_key(request: Request, call_next):
 def initialize() -> None:
     init_personal_app_db()
     init_strava_db()
+    init_athlete_db()
 
 
 @app.get("/", include_in_schema=False)
@@ -100,7 +106,7 @@ def health() -> dict[str, str]:
 
 @app.get("/app", response_class=HTMLResponse, include_in_schema=False)
 def personal_app() -> str:
-    return enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML))
+    return enhance_athlete_ui(enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML)))
 
 
 @app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
