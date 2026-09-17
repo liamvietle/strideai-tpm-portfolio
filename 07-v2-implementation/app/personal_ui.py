@@ -85,6 +85,7 @@ button,input,select,textarea{font:inherit}.shell{max-width:760px;margin:0 auto;p
     <div class="card"><h2>Deployment metrics</h2><div id="metrics" class="empty">Open this tab to load metrics.</div></div>
   </section>
 </div>
+<footer style="text-align:center;padding:16px 24px 28px"><a href="/privacy" style="color:inherit">Privacy policy</a></footer>
 <div id="toast" class="toast" role="status"></div>
 <script>
 (()=>{

@@ -33,6 +33,7 @@ from app.personal_models import DailyCheckInInput, PersonalRecommendationRespons
 from app.personal_service import create_personal_recommendation
 from app.personal_storage import init_personal_app_db
 from app.personal_ui import PERSONAL_APP_HTML
+from app.privacy import PRIVACY_HTML
 from app.quality import summarize_explanation_records
 from app.retrieval import load_history, retrieve_similar_history
 from app.storage import (
@@ -64,7 +65,7 @@ app = FastAPI(
 )
 
 APP_KEY = os.getenv("STRIDEAI_APP_KEY", "").strip()
-PUBLIC_PATHS = {"/", "/app", "/health", "/app/api/strava/callback"}
+PUBLIC_PATHS = {"/", "/app", "/privacy", "/health", "/app/api/strava/callback"}
 
 
 @app.middleware("http")
@@ -100,6 +101,11 @@ def health() -> dict[str, str]:
 @app.get("/app", response_class=HTMLResponse, include_in_schema=False)
 def personal_app() -> str:
     return enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML))
+
+
+@app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
+def privacy_policy() -> str:
+    return PRIVACY_HTML
 
 
 @app.get('/app/api/plan')
