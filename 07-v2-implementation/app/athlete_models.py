@@ -49,8 +49,11 @@ class AthleteProfile(StrictModel):
     )
     max_session_minutes: int = Field(60, ge=10, le=240)
     race_priority: Literal["A", "B", "C"] = "A"
+    long_run_day: int | None = Field(None, ge=0, le=6)
+    include_strength: bool = False
+    strength_days: list[int] = Field(default_factory=list, max_length=3)
 
-    @field_validator("available_days")
+    @field_validator("available_days", "strength_days")
     @classmethod
     def valid_days(cls, v):
         if len(v) != len(set(v)) or any(d < 0 or d > 6 for d in v):
@@ -59,6 +62,10 @@ class AthleteProfile(StrictModel):
 
     @model_validator(mode="after")
     def heart_rates(self):
+        if self.long_run_day is not None and self.long_run_day not in self.available_days:
+            raise ValueError("Long-run day must be an available day.")
+        if self.include_strength and (not self.strength_days or any(d not in self.available_days for d in self.strength_days)):
+            raise ValueError("Choose one to three available days for strength training.")
         if self.max_hr and self.threshold_hr and self.threshold_hr > self.max_hr:
             raise ValueError("Threshold HR cannot exceed maximum HR.")
         if self.resting_hr and self.max_hr and self.resting_hr >= self.max_hr:
@@ -69,7 +76,9 @@ class AthleteProfile(StrictModel):
 
 
 class GeneratePlan(StrictModel):
-    start_date: Date
+    start_date: Date | None = None
+    start_mode: Literal["custom", "today", "next_monday", "recommended"] = "custom"
+    duration_weeks: int | None = Field(None, ge=1, le=32)
     replace_existing: bool = False
 
 

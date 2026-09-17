@@ -21,6 +21,44 @@ from app.training_plan import RaceGoal, save_goal
 DAY = date(2026, 9, 17)
 
 
+def test_combined_calendar_strength_and_start():
+    from app.athlete_planning import plan_setup
+    setup()
+    store.patch_profile({'long_run_day': 5, 'include_strength': True, 'strength_days': [1]})
+    result = generate(GeneratePlan(start_mode='next_monday', replace_existing=True), 'viet')
+    assert result['start_date'] == '2026-09-21'
+    rows = workouts()
+    future = [w['current'] for w in rows if w['date'] >= result['start_date']]
+    assert all(date.fromisoformat(w['date']).weekday() == 5 for w in future if w['kind'] == 'long')
+    strength = [w for w in future if w['strength_session']]
+    assert strength
+    assert all(date.fromisoformat(w['date']).weekday() == 1 for w in strength)
+    assert all(w['strength_minutes'] + w['duration_minutes'] <= 150 for w in strength)
+    assert plan_setup('viet')['recommended_weeks'] == 16
+
+
+def test_combined_forecast_is_dated_and_separate():
+    from app.race_prediction import race_prediction
+    setup()
+    assert race_prediction()['status'] == 'unavailable'
+    store.patch_profile({'pbs': [{'distance_km': 42.195, 'time_seconds': 14400, 'date': '2026-09-01'}]})
+    first = race_prediction()
+    assert first['predicted_seconds'] == 14400
+    assert first['goal_seconds'] == 13800
+    store.patch_profile({'pbs': [{'distance_km': 42.195, 'time_seconds': 14100, 'date': '2026-09-16'}]})
+    assert race_prediction()['predicted_seconds'] == 14100
+    assert race_prediction('someone-else')['status'] == 'unavailable'
+
+
+def test_combined_invalid_calendar():
+    from pydantic import ValidationError
+    setup()
+    with pytest.raises(ValidationError):
+        store.patch_profile({'long_run_day': 2})
+    with pytest.raises(ValidationError):
+        store.patch_profile({'include_strength': True, 'strength_days': []})
+
+
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch, tmp_path):
     monkeypatch.setenv("STRIDEAI_DB_PATH", str(tmp_path / "loop.db"))
