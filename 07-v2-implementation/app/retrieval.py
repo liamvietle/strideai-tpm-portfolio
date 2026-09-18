@@ -43,6 +43,9 @@ def retrieve_similar_history(
     limit: int = 3,
 ) -> list[RetrievedCase]:
     cases = list(history) if history is not None else load_history()
+    from app.accounts import enabled
+    if enabled():
+        cases = [case for case in cases if case.athlete_id == workout.athlete_id]
     ranked: list[RetrievedCase] = []
 
     for case in cases:
