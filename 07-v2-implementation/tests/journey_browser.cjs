@@ -24,10 +24,14 @@ await page.getByRole('heading',{name:'Choose how you want to train'}).waitFor();
 const today=await page.locator('#coachStart').inputValue();const end=new Date(today+'T12:00:00Z');end.setUTCDate(end.getUTCDate()+90);
 await page.locator('#raceName').fill('My first plan');await page.locator('#raceDate').fill(end.toISOString().slice(0,10));await page.locator('#raceTime').fill('04:00');await page.locator('#goalForm button').click();await page.waitForFunction(()=>document.getElementById('goalStatus').textContent.includes('saved'));
 if(process.env.MODE==='import'){
+await page.locator('#coachGenerate').click();await page.waitForFunction(()=>document.getElementById('coachStatus').textContent.includes('sessions generated'));
 await page.getByRole('button',{name:/I already have a plan/}).click();
 await page.locator('#planText').fill(`${today} | 5 | run | My easy run\n${end.toISOString().slice(0,10)} | 0 | other | Strength`);
 await page.locator('#savePlan').click();await page.waitForFunction(()=>document.getElementById('planImportStatus').textContent.includes('Saved'));
-await page.getByRole('button',{name:'Use this imported plan',exact:true}).click();
+await page.getByRole('button',{name:'Continue with saved plan',exact:true}).click();
+await page.getByText(/Select .Replace my upcoming coaching plan/).waitFor();
+await page.locator('#replaceImportedPlan').check();
+await page.getByRole('button',{name:'Continue with saved plan',exact:true}).click();
 }else{
 await page.locator('#coachGenerate').click();await page.waitForFunction(()=>document.getElementById('coachStatus').textContent.includes('sessions generated'));
 await page.getByRole('button',{name:'Finish setup',exact:true}).click();
