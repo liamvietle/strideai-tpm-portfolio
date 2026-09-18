@@ -1,6 +1,6 @@
 """Resumable setup and activation of user-authored plans."""
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel, Field
 from app import athlete_store as store
 from app.storage import connect
@@ -11,6 +11,10 @@ router = APIRouter(prefix='/app/api/journey')
 class SetupState(BaseModel):
     step: int = Field(0, ge=0, le=2)
     finished: bool = False
+
+
+class ActivateImport(BaseModel):
+    replace_existing: bool = False
 
 
 def init_journey():
@@ -42,8 +46,9 @@ def save_status(payload: SetupState, athlete_id: str = 'viet'):
 
 
 @router.post('/activate-import')
-def activate_import(athlete_id: str = 'viet'):
+def activate_import(athlete_id: str = 'viet', payload: ActivateImport | None = Body(default=None)):
     """Bring a reviewed snapshot into coaching without guessing workout intensity."""
+    replace_existing = isinstance(payload, ActivateImport) and payload.replace_existing
     init_journey()
     progress = plan_progress(athlete_id)
     if not progress.get('days'):
@@ -54,12 +59,16 @@ def activate_import(athlete_id: str = 'viet'):
         raise HTTPException(409, 'Your plan needs at least one session today or later.')
     with connect() as c:
         c.execute("BEGIN IMMEDIATE")
-        # Avoid silently overwriting another plan or saved expectations.
-        if c.execute('SELECT 1 FROM coach_workouts WHERE athlete_id=? AND active=1 AND date>=? LIMIT 1', (athlete_id, today)).fetchone():
-            raise HTTPException(409, 'A coaching plan already exists. Your imported snapshot is saved, but has not replaced your coaching plan.')
+        existing = list(c.execute('SELECT id,date,state FROM coach_workouts WHERE athlete_id=? AND active=1 AND date>=?', (athlete_id, today)))
+        if existing and not replace_existing:
+            raise HTTPException(409, 'Select “Replace my upcoming coaching plan” to use your saved plan. Completed sessions and locked expectations will be kept.')
+        locked_dates = {r['date'] for r in existing if r['state'] != 'planned'}
+        if replace_existing:
+            c.execute("UPDATE coach_workouts SET active=0 WHERE athlete_id=? AND active=1 AND date>=? AND state='planned'", (athlete_id, today))
+        activated = 0
         for d in days:
             # Non-running sessions remain in the imported calendar and daily check-in.
-            if d['activity'] != 'run':
+            if d['activity'] != 'run' or d['date'] in locked_dates:
                 continue
             w = {'date': d['date'], 'kind': 'custom', 'phase': 'athlete_plan',
                  'purpose': d['note'] or 'Your planned run', 'key_session': False,
@@ -68,6 +77,7 @@ def activate_import(athlete_id: str = 'viet'):
                  'pace_basis': 'Imported plan: intensity and duration not specified', 'pace_samples': 0,
                  'instructions': 'Follow your original session instructions. Confirm intensity in your daily check-in. Duration shown is a provisional estimate at 8 min/km.',
                  'source': 'imported'}
+            activated += 1
             c.execute('INSERT INTO coach_workouts(athlete_id,race_id,date,original_json,current_json) VALUES(?,?,?,?,?)',
                       (athlete_id, progress['goal']['id'], d['date'], json.dumps(w), json.dumps(w)))
-    return {'activated': sum(d['activity']=='run' for d in days)}
+    return {'activated': activated, 'preserved_dates': sorted(locked_dates)}
