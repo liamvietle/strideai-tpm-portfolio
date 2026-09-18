@@ -211,8 +211,14 @@ async def protect(request, call_next):
     init_accounts()
     path=request.url.path.rstrip('/') or '/'
     if request.method not in {'GET','HEAD','OPTIONS'} and request.headers.get('Origin'):
-        origin=urlsplit(request.headers['Origin'])
-        if origin.netloc != request.url.netloc or origin.scheme != request.url.scheme:
+        origin = urlsplit(request.headers['Origin'])
+        # Railway terminates HTTPS before forwarding to Uvicorn. Compare against
+        # the public proxy values instead of the internal HTTP request URL.
+        forwarded_host = request.headers.get('X-Forwarded-Host', '').split(',')[0].strip()
+        public_host = forwarded_host or request.headers.get('Host', '')
+        forwarded_proto = request.headers.get('X-Forwarded-Proto', '').split(',')[0].strip()
+        public_scheme = forwarded_proto or request.url.scheme
+        if origin.netloc.lower() != public_host.lower() or origin.scheme.lower() != public_scheme.lower():
             return JSONResponse({'detail':'Cross-origin request rejected.'},status_code=403)
     if path in PUBLIC:
         response=await call_next(request)

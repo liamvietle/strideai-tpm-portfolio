@@ -88,3 +88,7 @@ def test_plan_ownership_invite_replay_and_origin(clients):
     assert other.post('/auth/register',json={'username':'third','password':PASSWORD,'invite':invitation}).status_code==200
     assert other.post('/auth/register',json={'username':'fourth','password':PASSWORD,'invite':invitation}).status_code==403
     assert owner.post('/auth/login',headers={'Origin':'https://other.example'},json={'username':'owner','password':PASSWORD}).status_code==403
+    # Railway terminates TLS and forwards an internal HTTP request.
+    proxy_headers={'Origin':'https://stride-ai.app','Host':'stride-ai.app','X-Forwarded-Proto':'https','X-Forwarded-Host':'stride-ai.app'}
+    assert owner.post('/auth/login',headers=proxy_headers,json={'username':'owner','password':PASSWORD}).status_code==200
+    assert owner.post('/auth/login',headers={**proxy_headers,'Origin':'http://stride-ai.app'},json={'username':'owner','password':PASSWORD}).status_code==403
