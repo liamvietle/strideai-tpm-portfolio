@@ -119,3 +119,18 @@ Daily snapshots use the additive `coach_race_forecasts` table. The displayed ran
 is heuristic, not calibrated. Workout completion alone does not change the time
 estimate; evaluated workouts continue to feed the existing athlete-learning loop.
 No extra environment variables are required.
+
+### Progress-sensitive race estimate
+
+The existing calendar preferences, optional strength and plan-start suggestions remain intact.
+Race prediction now also uses evaluated, completed race workouts (distance within 3% of the
+planned event and no reported pain). It never interprets ordinary training as a maximal race.
+After the latest performance anchor, six easy sessions across at least three weeks can
+supply an experimental adjustment: match HR within 5 bpm, RPE within 0.5 and duration
+within 20%, compare median pace, apply half the change, capped at ±3%. Active injury
+pauses this adjustment. These thresholds are product heuristics, not a validated race
+prediction model; weather, terrain and race-specific endurance remain limitations.
+Without a recent dated performance anchor the forecast stays unavailable.
+The forecast refreshes on Coach entry, profile save and workout evaluation, with daily
+snapshots in the existing coach_race_forecasts table. No new migration or environment
+variable is required. Goal time remains separate and never drives the estimate.

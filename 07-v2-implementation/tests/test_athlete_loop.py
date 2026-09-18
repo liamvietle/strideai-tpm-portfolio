@@ -586,3 +586,39 @@ def test_decision_does_not_initialize_schema_inside_write_transaction(monkeypatc
 
     monkeypatch.setattr(store, "today", real_lookup)
     assert decide(w["id"], Decision(choice="accept"), "viet")["choice"] == "accept"
+
+
+def test_race_progress_requires_comparable_effort_and_caps_change():
+    from app.race_prediction import training_progress
+    def sample(day, pace, hr=140, rpe=3):
+        return {'date': (DAY-timedelta(days=day)).isoformat(),
+                'workout': {'kind': 'easy'},
+                'execution': {'completed': True, 'pain': False,
+                              'distance_km': 3600/pace, 'duration_seconds': 3600,
+                              'average_hr': hr, 'rpe': rpe}}
+    observations = [sample(d, 400) for d in [40, 35, 30]] + [sample(d, 360) for d in [15, 10, 5]]
+    result = training_progress(observations)
+    assert result['adjustment_fraction'] == -.03
+    assert training_progress(observations, True)['adjustment_fraction'] == 0
+    assert training_progress(observations[:5])['status'] == 'insufficient_data'
+    for o in observations[3:]:
+        o['execution']['average_hr'] = 160
+    assert training_progress(observations)['status'] == 'insufficient_data'
+    for o in observations:
+        o['workout']['kind'] = 'threshold'
+    assert training_progress(observations)['status'] == 'insufficient_data'
+
+
+def test_completed_race_updates_forecast_but_easy_run_does_not(monkeypatch):
+    from app.race_prediction import race_prediction
+    setup()
+    observation = {'date': (DAY-timedelta(days=1)).isoformat(),
+                   'workout': {'kind': 'easy', 'distance_km': 42.195},
+                   'execution': {'completed': True, 'pain': False,
+                                 'distance_km': 42.195, 'duration_seconds': 14400}}
+    monkeypatch.setattr(store, 'observations', lambda athlete: [observation])
+    assert race_prediction()['status'] == 'unavailable'
+    observation['workout']['kind'] = 'race'
+    assert race_prediction()['predicted_seconds'] == 14400
+    observation['execution']['completed'] = False
+    assert race_prediction()['status'] == 'unavailable'
