@@ -4,13 +4,15 @@ const $=id=>document.getElementById(id);
 const make=(tag,text,parent,cls)=>{const n=document.createElement(tag);if(text)n.textContent=text;if(cls)n.className=cls;if(parent)parent.append(n);return n};
 const button=(text,parent,fn,cls='secondary')=>{const b=make('button',text,parent,cls);b.type='button';b.onclick=fn;return b};
 const shell=document.querySelector('.shell'), oldNav=document.querySelector('.nav');
-const nav=make('nav',null,null,'journey-nav');nav.setAttribute('aria-label','Main navigation');oldNav.after(nav);nav.hidden=true;
+const nav=make('nav',null,null,'journey-nav');nav.setAttribute('aria-label','Main navigation');oldNav.after(nav);nav.hidden=true;const menu=make('details',null,nav);make('summary','Plan, progress and settings',menu);const menuLinks=make('div',null,menu,'journey-links');
 const loading=make('p','Loading your training…',shell,'card');loading.setAttribute('role','status');
 const pages={};let setupState=null, mode='generate', current='today', refreshing=false;
 const names={today:'Today',training:'Training',progress:'Progress',you:'You'};
-for(const [id,label] of Object.entries(names)){const page=make('div',null,shell,'journey-page');page.id='journey-'+id;page.hidden=true;pages[id]=page;button(label,nav,()=>show(id),'').dataset.page=id;}
+for(const [id,label] of Object.entries(names)){const page=make('div',null,shell,'journey-page');page.id='journey-'+id;page.hidden=true;pages[id]=page;button(label,menuLinks,()=>{menu.open=false;show(id)},'').dataset.page=id;}
 function refreshLegacy(tab){refreshing=true;document.querySelector(`[data-tab="${tab}"]`).click();refreshing=false;}
-function show(id){current=id;for(const [k,p] of Object.entries(pages))p.hidden=k!==id;setup.hidden=true;nav.hidden=false;for(const b of nav.children){if(b.dataset.page===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}if(id==='training'){refreshLegacy('plan');refreshLegacy('coach');}if(id==='progress'){refreshLegacy('review');refreshLegacy('history');refreshLegacy('coach');}if(id==='you'){refreshLegacy('athlete');refreshLegacy('data');}if(id==='today')home().catch(error);}
+function show(id){current=id;dailyHost.hidden=id!=='today';if(id!=='today'){$('coach').append($('coachDetail'));$('coachDetail').hidden=true;}else dailyHost.append($('coachDetail'));for(const [k,p] of Object.entries(pages))p.hidden=k!==id;setup.hidden=true;nav.hidden=false;for(const b of menuLinks.children){if(b.dataset.page===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}if(id==='training'){refreshLegacy('plan');refreshLegacy('coach');}if(id==='progress'){pages.progress.prepend($('review'));refreshLegacy('review');refreshLegacy('history');refreshLegacy('coach');}if(id==='you'){refreshLegacy('athlete');refreshLegacy('data');}if(id==='today'){weekReview.append($('review'));home().catch(error)};}
+const dailyHost=make('div',null,$('today'));dailyHost.id='dailyStepContent';let dailyOpen=false,homeVersion=0,lastStage=null;
+for(const id of ['training','progress','you']){const backToday=button('Back to today',pages[id],()=>show('today'));pages[id].prepend(backToday);}
 const map={today:'today',coach:'training',plan:'training',review:'progress',history:'progress',athlete:'you',data:'you'};
 for(const b of oldNav.children)b.addEventListener('click',()=>{if(!refreshing)show(map[b.dataset.tab]);});
 function fold(title,node,parent){const d=make('details',null,parent);make('summary',title,d);d.append(node);return d;}
@@ -20,7 +22,7 @@ pages.you.append($('athlete'));
 const historyImport=$('coachImport').closest('.card');$('data').append(historyImport);historyImport.querySelector('.hint').textContent='Connect Strava above, or upload Garmin CSV / TCX here. Previously imported activities remain available.';
 if($('csvFile'))$('csvFile').closest('.card').hidden=true;
 const activities=$('recentActivitiesCard');if(activities)fold('Synced activities',activities,pages.progress);
-const dataFold=fold('Connections, imports and access',$('data'),pages.you);dataFold.open=true;
+const dataFold=fold('Connections, imports and access',$('data'),pages.you);dataFold.open=false;
 const planFold=fold('Race goal and imported calendar',$('plan'),pages.training);
 // Keep generated sessions together and tuck setup controls away once training begins.
 const coachCard=$('coachGenerate').closest('.card');
@@ -55,9 +57,31 @@ $('coachTodayOpen').parentElement.querySelector('.hint').hidden=true;
 $('coachToday').previousElementSibling.textContent='Your next step';
 $('checkinForm').querySelector('h2').textContent='Daily check-in';
 $('checkinForm').querySelector('.hint').textContent='Confirm today’s session and tell us how you feel. Optional health numbers can stay blank.';
+// Keep routine decisions visible; measurements and implementation details are optional.
+const recoveryGrid=$('sleep_hours').closest('.grid');
+const healthFields=make('div',null,null,'grid');
+for(const id of ['hrv_ms','hrv_baseline_low','hrv_baseline_high','resting_hr_bpm','recent_load_ratio'])healthFields.append($(id).closest('.field'));
+fold('Health measurements (optional)',healthFields,recoveryGrid.parentElement);
+recoveryGrid.parentElement.querySelector('.hint').textContent='Tell us how you feel, including muscle soreness. Flag pain separately. Synced health data is used when available.';
+fold('Weather for this run (optional)',$('weatherCity').closest('.card'),$('checkinForm'));
+const traitCard=$('coachTraits').closest('.card');
+traitCard.querySelector('h2').textContent='What StrideAI has learned';
+traitCard.querySelector('.hint').textContent='These patterns personalize future guidance. They update as you log sessions; you do not need to manage them.';
+fold('What StrideAI has learned',traitCard,pages.progress);
+fold('Past health measurements',$('athleteHealth').closest('.field'),$('athleteForm'));
+const resultDetails=make('div');
+resultDetails.append($('comparison'),$('sleepAvg').closest('.metricrow'),$('factors'));
+fold('Why this recommendation?',resultDetails,$('explanation').parentElement);
+fold('Record a basic outcome',$('currentOutcome').closest('.card'),$('result'));
+recoveryGrid.append($('human_decision').closest('.field'));
+const sessionFields=$('planned_activity_type').closest('.grid');
+const sessionDetails=fold('Change session details',sessionFields,$('checkinForm').querySelector('.card'));
 const checkFold=fold('Check in before training',$('checkinForm'),$('today'));checkFold.id='journeyCheckin';
 $('today').insertBefore(checkFold,$('result'));
-const homeIntro=make('p','Before training, check in and review your targets. Afterward, sync your activity and record how it felt.',null,'hint');$('today').prepend(homeIntro);
+const stepLabel=make('p','',null,'hint');stepLabel.id='dailyStepLabel';$('coachToday').before(stepLabel);
+const dailyError=make('p','',dailyHost);dailyError.id='dailyStepError';dailyError.setAttribute('role','alert');
+fold('Check-in recommendation',$('result'),$('today'));
+const weekReview=fold('Your weekly review',$('review'),pages.today);weekReview.id='dailyWeeklyReview';weekReview.addEventListener('toggle',()=>{if(weekReview.open)refreshLegacy('review')});
 const homeAction=button('Start daily check-in',$('coachToday').parentElement,()=>{checkFold.open=true;$('sleep_hours').focus();});homeAction.id='journeyCheckinButton';homeAction.disabled=true;
 const editSetup=button('Review guided setup',pages.you,()=>begin(0));
 // Hide operational diagnostics behind an explicit maintenance disclosure.
@@ -97,8 +121,9 @@ heading.focus();}
 async function advance(){try{next.disabled=true;if(setupState.step===0){const form=$('athleteForm');if(!form.reportValidity())return;await form.onsubmit({preventDefault(){}});if(!$('athleteStatus').textContent.startsWith('Profile saved'))throw new Error($('athleteStatus').textContent);await begin(1);}else if(setupState.step===1){await begin(2);}else{const s=await api('/app/api/journey');if(!s.has_plan)throw new Error('Generate or save your plan first, or choose “Finish setup later”.');if(mode==='import'){await api('/app/api/journey/activate-import','POST',{replace_existing:replaceImport.checked});}await finish();}}catch(e){error(e)}finally{next.disabled=false}}
 async function finish(){try{setupState=await api('/app/api/journey','PUT',{step:setupState?.step||0,finished:true});restore();config.hidden=false;importCard.hidden=false;show('today');}catch(e){error(e)}}
 async function home(){
-homeAction.disabled=true;
+const version=++homeVersion;homeAction.disabled=true;
 const [profile,workouts,plan,history]=await Promise.all([api('/app/api/coach/profile'),api('/app/api/coach/workouts'),api('/app/api/plan'),api('/app/api/history?limit=7')]);
+if(version!==homeVersion||current!=='today')return;
 const checked=history.some(h=>h.checkin_date===profile.today);
 homeAction.className=checked?'secondary':'primary';$('coachTodayOpen').className=checked?'primary':'secondary';
 const w=workouts.find(w=>w.date===profile.today), own=plan.days?.find(d=>d.date===profile.today);
@@ -108,10 +133,33 @@ else if(w?.current.distance_km===0){$('coachToday').textContent=checked?'Recover
 else if(w){$('coachToday').textContent=`${w.current.distance_km} km · ${w.current.purpose}. ${w.evaluation?'Session reviewed. See what you learned.':w.execution?'Your run is saved. Review the result.':w.prediction?'Your targets are ready. Review them before training.':checked?'Check-in saved. View your workout to set execution targets.':'Start with a recovery check-in, then review your workout targets.'}`;}
 else{$('coachToday').textContent=own?`${own.activity==='rest'?'Recovery day':own.activity==='other'?'Non-running session':own.distance_km+' km run'} · ${own.note||'Your plan'}`:plan.days?.length?'No session scheduled today. Rest or check in with what you choose to do.':'You can check in today, or use guided setup to choose your training plan.';}
 homeAction.onclick=()=>{checkFold.open=true;const session=w?.current;if(session||own){$('checkin_date').value=profile.today;$('planned_activity_type').value=session?(session.distance_km>0?'run':session.strength_session?'strength':'rest'):own.activity;$('planned_activity_type').dispatchEvent(new Event('change'));$('planned_intensity').required=false;$('planned_distance_km').value=session?.distance_km??own.distance_km;$('planned_activity_note').value=(session?.purpose||own.note||'').slice(0,200);if(session?.kind==='custom'){const option=make('option','Choose intensity from your plan');option.value='';$('planned_intensity').prepend(option);$('planned_intensity').value='';$('planned_intensity').required=true;}else $('planned_intensity').value=session?.kind==='threshold'?'threshold':session?.kind==='race'?'race':'easy';}$('sleep_hours').focus();};
+const running=!!w&&w.original.distance_km>0;
+const stage=w?.evaluation?'review':w?.execution?'review':!checked?'checkin':!w?.prediction||!w?.choice?'prepare':'execute';
+if(stage==='execute'&&lastStage!==stage){dailyOpen=false;$('coachDetail').hidden=true;}lastStage=stage;
+stepLabel.textContent=running?({checkin:'Step 1 of 4 · Check in',prepare:'Step 2 of 4 · Review your run',execute:'Step 3 of 4 · Run and record',review:'Step 4 of 4 · Review and learn'}[stage]):checked?'Check-in saved · You’re set for today':'Today · Check in';
+const fillCheckin=homeAction.onclick;
+const openCheckin=()=>{fillCheckin();sessionDetails.open=!w&&!own||w?.current.kind==='custom'||!running;};
+homeAction.onclick=openCheckin;
+homeAction.hidden=running&&stage!=='checkin';
+$('coachTodayOpen').hidden=!w||(!running&&!w.current.strength_session)||running&&stage==='checkin';
+if(running){$('coachTodayOpen').textContent=stage==='prepare'?'Review today’s run':stage==='execute'?'I’ve finished my run':'Review my result';}
+else $('coachTodayOpen').textContent='View strength session';
+checkFold.hidden=running&&stage!=='checkin';
+if(running&&stage==='checkin')homeAction.onclick=()=>{openCheckin();homeAction.hidden=true;};
+$('coachTodayOpen').onclick=async()=>{dailyOpen=true;await openDaily(w,stage);};
+const oldShortcut=$('recordWithoutPrediction');if(oldShortcut)oldShortcut.remove();
+if(running&&!w.execution&&!w.prediction){const already=button('Already ran? Record the result',$('coachToday').parentElement,async()=>{dailyOpen=true;await openDaily(w,'execute')});already.id='recordWithoutPrediction';}
+if(dailyOpen&&w&&stage!=='checkin')await openDaily(w,stage);
+if(!running&&checked){homeAction.textContent='Edit today’s check-in';checkFold.open=false;}
 homeAction.disabled=false;
 }
+async function openDaily(w,stage){
+try{dailyError.textContent='';dailyHost.append($('coachDetail'));dailyHost.hidden=false;await window.strideOpenWorkout(w,stage==='checkin'?'prepare':stage);$('coachTodayOpen').hidden=true;
+if(stage==='execute'&&!w.execution){const title=make('p','After your run, sync Strava or enter the totals below.',null,'hint');$('coachDetail').prepend(title);const sync=button('Sync Strava',title,async()=>{sync.disabled=true;try{await api('/app/api/strava/sync','POST');await home();}catch(e){dailyError.textContent=e.message;}finally{sync.disabled=false;}});}
+}catch(e){dailyError.textContent=e.message;}
+}
 window.addEventListener('strideai:workouts-loaded',()=>{if(current==='today'&&setup.hidden)home().catch(error)});
-window.addEventListener('strideai:checkin-saved',()=>{checkFold.open=false;home().catch(error)});
+window.addEventListener('strideai:checkin-saved',()=>{checkFold.open=false;dailyOpen=true;home().catch(error)});
 window.addEventListener('strideai:strava-synced',()=>{if(current==='today'&&setup.hidden)home().catch(error)});
 $('saveKey').addEventListener('click',()=>setTimeout(load,100));
 async function load(){try{setupState=await api('/app/api/journey');if(setupState.finished){restore();show('today');}else renderSetup();}catch(e){setup.hidden=false;nav.hidden=true;error(e)}finally{loading.remove()}}

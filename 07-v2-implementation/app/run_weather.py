@@ -26,7 +26,7 @@ def find_places(name):
     response = httpx.get('https://geocoding-api.open-meteo.com/v1/search', params={'name': name, 'count': 5, 'language': 'en', 'format': 'json'}, timeout=4)
     response.raise_for_status()
     return [{'name': ', '.join(str(r[k]) for k in ('name', 'admin1', 'country') if r.get(k)),
-             'latitude': r['latitude'], 'longitude': r['longitude']}
+             'latitude': r['latitude'], 'longitude': r['longitude'], 'timezone': r.get('timezone', 'UTC')}
             for r in response.json().get('results', [])]
 
 

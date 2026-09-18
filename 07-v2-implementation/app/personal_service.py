@@ -61,6 +61,11 @@ def _snapshot_from_row(row: dict) -> RecoverySnapshot:
 
 def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWorkoutInput, float | None]:
     payload = enrich_with_apple_health(payload)
+    from app.training_plan import get_goal
+    goal = get_goal(payload.athlete_id)
+    if goal:
+        remaining = (date.fromisoformat(goal['race_date']) - date.fromisoformat(payload.checkin_date)).days
+        payload = payload.model_copy(update={'days_until_event': remaining if 0 <= remaining <= 365 else None})
     calculated_load = calculate_recent_load_ratio(payload.athlete_id, payload.checkin_date)
     effective_load = payload.recent_load_ratio if payload.recent_load_ratio is not None else calculated_load
     start = (date.fromisoformat(payload.checkin_date) - timedelta(days=7)).isoformat()

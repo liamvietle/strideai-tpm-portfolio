@@ -6,7 +6,7 @@ def enhance_journey_ui(html):
     script = Path(__file__).with_name('journey_ui.js').read_text()
     style = '''<style>
 .nav{display:none!important}[hidden]{display:none!important}
-.journey-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;position:sticky;top:0;z-index:25;background:var(--bg);padding:10px 0}
+.journey-nav{margin:10px 0}.journey-nav summary{cursor:pointer;padding:10px 0;color:var(--muted)}.journey-links{display:flex;gap:6px;flex-wrap:wrap}
 .journey-nav button{min-height:46px;border:1px solid var(--line);border-radius:12px;background:white;font-weight:700;color:var(--muted)}
 .journey-nav button[aria-current=page]{background:var(--text);color:white}
 .journey-page>.panel,.journey-page details>.panel,#setupContent>.panel{display:block}

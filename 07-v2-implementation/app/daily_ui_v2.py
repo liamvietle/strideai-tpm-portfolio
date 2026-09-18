@@ -39,9 +39,9 @@ FORM_HANDLER = r'''document.addEventListener('submit',async e=>{
       planned_activity_note:$('planned_activity_note').value.trim()||null,
       sleep_hours:parseSleep(sleepText),hrv_ms:optional('hrv_ms'),hrv_baseline_low:optional('hrv_baseline_low'),
       hrv_baseline_high:optional('hrv_baseline_high'),resting_hr_bpm:optional('resting_hr_bpm'),
-      soreness_0_10:optional('soreness_0_10'),pain_flag:$('pain_flag').checked,
-      subjective_fatigue:$('subjective_fatigue').value,recent_load_ratio:optional('recent_load_ratio'),
-      days_until_event:optional('days_until_event'),human_decision:isRun?$('human_decision').value:null
+      soreness_0_10:({sore:5,very_sore:8}[$('subjective_fatigue').value]??null),pain_flag:$('pain_flag').checked,
+      subjective_fatigue:({sore:'normal',very_sore:'normal'}[$('subjective_fatigue').value]||$('subjective_fatigue').value),recent_load_ratio:optional('recent_load_ratio'),
+      days_until_event:null,human_decision:isRun?$('human_decision').value:null
     };
     const d=await call('/app/api/daily-checkin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(d.mode==='recovery_only_checkin'){

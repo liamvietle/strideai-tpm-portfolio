@@ -6,6 +6,7 @@ from statistics import median
 from app import athlete_store as store
 from app.storage import connect
 from app.training_plan import get_goal
+from app.race_weather import race_weather, weather_range
 
 
 def race_prediction(athlete='viet'):
@@ -14,6 +15,7 @@ def race_prediction(athlete='viet'):
     if not goal:
         return {'status': 'unavailable', 'reason': 'Save a race goal first.'}
     today = store.today(athlete)
+    weather = race_weather(goal, today)
     evidence = []
     seen = set()
     for pb in p.pbs:
@@ -54,16 +56,18 @@ def race_prediction(athlete='viet'):
     progress = training_progress([o for o in observations if evidence and o['date'] > evidence[0]['date']], p.active_injury)
     result = {'status': 'estimated' if evidence else 'unavailable', 'as_of': today.isoformat(),
               'goal_seconds': round(goal['goal_minutes']*60), 'evidence': evidence,
-              'confidence': 'provisional', 'training_progress': progress, 'evaluated_sessions_42d': len(observations),
+              'weather': weather, 'confidence': 'provisional', 'training_progress': progress, 'evaluated_sessions_42d': len(observations),
               'method': 'Recent dated performance equivalence, exponent 1.06. Not a validated race forecast.',
               'reason': 'Add a dated recent race/PB in Athlete. Ordinary training runs are not treated as maximal races.',
-              'limitations': 'Course, weather and race-specific endurance are not modeled. Completion alone does not prove a faster race time.'}
+              'limitations': 'Course and race-specific endurance are not modeled. Weather affects the planning range only. Completion alone does not prove a faster race time.'}
     if evidence:
         estimate = round(median(e['estimate'] for e in evidence))
         anchor_estimate = estimate
         if progress['status'] == 'comparable':
             estimate = round(estimate * (1 + progress['adjustment_fraction']))
-        result.update(anchor_seconds=anchor_estimate, predicted_seconds=estimate, range_seconds=[round(estimate*.93), round(estimate*1.10)],
+        adjusted_range, weather_note = weather_range(estimate, weather)
+        result['weather_explanation'] = weather_note
+        result.update(anchor_seconds=anchor_estimate, predicted_seconds=estimate, range_seconds=adjusted_range,
                       reason='Updates with dated PBs and completed races; comparable easy sessions can apply a provisional adjustment capped at 3%. Range is heuristic, not a calibrated confidence interval.')
     with connect() as c:
         c.execute('CREATE TABLE IF NOT EXISTS coach_race_forecasts (athlete_id TEXT, race_id INTEGER, as_of TEXT, forecast_json TEXT, PRIMARY KEY(athlete_id,race_id,as_of))')

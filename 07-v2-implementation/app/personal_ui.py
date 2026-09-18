@@ -34,7 +34,7 @@ button,input,select,textarea{font:inherit}.shell{max-width:760px;margin:0 auto;p
           <div class="field"><label>Date</label><input id="checkin_date" type="date" required></div>
           <div class="field"><label>Planned distance (km)</label><input id="planned_distance_km" type="number" min="0.1" max="100" step="0.1" required></div>
           <div class="field"><label>Planned intensity</label><select id="planned_intensity"><option>easy</option><option>moderate</option><option>threshold</option><option>interval</option><option>race</option></select></div>
-          <div class="field"><label>Days until target race</label><input id="days_until_event" type="number" min="0" max="365" placeholder="Optional"></div>
+          <input id="days_until_event" type="hidden">
           <div class="field full"><label>My decision before seeing StrideAI</label><select id="human_decision" required><option value="maintain">Maintain</option><option value="reduce_intensity">Reduce intensity</option><option value="reduce_volume">Reduce volume</option><option value="recovery_only">Recovery only</option></select></div>
         </div>
       </div>
@@ -46,8 +46,8 @@ button,input,select,textarea{font:inherit}.shell{max-width:760px;margin:0 auto;p
           <div class="field"><label>HRV baseline low</label><input id="hrv_baseline_low" type="number" min="0" step="1"></div>
           <div class="field"><label>HRV baseline high</label><input id="hrv_baseline_high" type="number" min="0" step="1"></div>
           <div class="field"><label>Resting HR</label><input id="resting_hr_bpm" type="number" min="20" max="220" step="1"></div>
-          <div class="field"><label>Soreness 0–10</label><input id="soreness_0_10" type="number" min="0" max="10" step="1" value="0"></div>
-          <div class="field"><label>How do you feel?</label><select id="subjective_fatigue"><option value="fresh">Fresh</option><option value="normal" selected>Normal</option><option value="slightly_tired">Slightly tired</option><option value="tired">Tired</option><option value="very_tired">Very tired</option></select></div>
+          <input id="soreness_0_10" type="hidden">
+          <div class="field"><label>How do you feel?</label><select id="subjective_fatigue"><option value="fresh">Fresh</option><option value="normal" selected>Normal</option><option value="slightly_tired">Slightly tired</option><option value="tired">Tired</option><option value="very_tired">Very tired</option><option value="sore">Sore muscles</option><option value="very_sore">Very sore / movement affected</option></select></div>
           <div class="field"><label>Load ratio</label><input id="recent_load_ratio" type="number" min="0" step="0.01" placeholder="Auto if Garmin data exists"></div>
           <div class="field full"><div class="checks"><label><input id="pain_flag" type="checkbox"> Pain before running</label></div></div>
         </div>
