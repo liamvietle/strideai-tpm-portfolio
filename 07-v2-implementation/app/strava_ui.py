@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.daily_ui_v2 import enhance_daily_ui
 from app.activities_ui import ACTIVITIES_CARD, ACTIVITIES_SCRIPT
+from app.apple_health_ui import enhance_apple_health_ui
 
 
 STRAVA_CARD = r'''
@@ -125,4 +126,5 @@ def enhance_personal_app(html: str) -> str:
     enhanced = html.replace(marker, marker + STRAVA_CARD + ACTIVITIES_CARD, 1)
     if enhanced == html:
         return html
-    return enhanced.replace('</body>', ACTIVITIES_SCRIPT + STRAVA_SCRIPT + '</body>', 1)
+    enhanced = enhanced.replace('</body>', ACTIVITIES_SCRIPT + STRAVA_SCRIPT + '</body>', 1)
+    return enhance_apple_health_ui(enhanced)

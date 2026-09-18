@@ -1,0 +1,26 @@
+{
+  "name": "strideai-health-companion",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit",
+    "build:ios": "eas build --platform ios --profile preview"
+  },
+  "dependencies": {
+    "@kingstinct/react-native-healthkit": "16.0.0",
+    "expo": "~57.0.23",
+    "expo-crypto": "~57.0.3",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-nitro-modules": "0.37.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  }
+}

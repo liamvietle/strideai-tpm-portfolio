@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 import json
 
 from fastapi import HTTPException
@@ -23,6 +23,7 @@ from app.recovery_storage import upsert_recovery_day
 from app.retrieval import load_history, retrieve_similar_history
 from app.storage import connect, save_recommendation
 from app.run_weather import forecast_guidance
+from app.apple_health import enrich_with_apple_health, health_rows
 
 
 def _day_index(checkin_date: str) -> int:
@@ -42,22 +43,37 @@ def _locked_checkin_exists(athlete_id: str, checkin_date: str) -> bool:
 def _snapshot_from_row(row: dict) -> RecoverySnapshot:
     return RecoverySnapshot(
         day_index=_day_index(row["checkin_date"]),
-        sleep_hours=row["sleep_hours"],
-        hrv_ms=row["hrv_ms"],
-        hrv_baseline_low=row["hrv_baseline_low"],
-        hrv_baseline_high=row["hrv_baseline_high"],
-        resting_hr_bpm=row["resting_hr_bpm"],
-        soreness_0_10=row["soreness_0_10"],
-        pain_flag=bool(row["pain_flag"]),
-        subjective_fatigue=row["subjective_fatigue"],
-        recent_load_ratio=row["recent_load_ratio"] if row["recent_load_ratio"] is not None else row["calculated_load_ratio"],
+        sleep_hours=row.get("sleep_hours"),
+        hrv_ms=row.get("hrv_ms"),
+        hrv_baseline_low=row.get("hrv_baseline_low"),
+        hrv_baseline_high=row.get("hrv_baseline_high"),
+        resting_hr_bpm=row.get("resting_hr_bpm"),
+        soreness_0_10=row.get("soreness_0_10"),
+        pain_flag=bool(row.get("pain_flag", False)),
+        subjective_fatigue=row.get("subjective_fatigue", "normal"),
+        recent_load_ratio=(
+            row.get("recent_load_ratio")
+            if row.get("recent_load_ratio") is not None
+            else row.get("calculated_load_ratio")
+        ),
     )
 
 
 def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWorkoutInput, float | None]:
+    payload = enrich_with_apple_health(payload)
     calculated_load = calculate_recent_load_ratio(payload.athlete_id, payload.checkin_date)
     effective_load = payload.recent_load_ratio if payload.recent_load_ratio is not None else calculated_load
-    history_rows = prior_checkins(payload.athlete_id, payload.checkin_date, days=7)
+    start = (date.fromisoformat(payload.checkin_date) - timedelta(days=7)).isoformat()
+    automatic_rows = health_rows(payload.athlete_id, start, payload.checkin_date)
+    manual_rows = prior_checkins(payload.athlete_id, payload.checkin_date, days=7)
+    merged = {row["checkin_date"]: row for row in automatic_rows}
+    for row in manual_rows:
+        base = merged.get(row["checkin_date"], {})
+        merged[row["checkin_date"]] = {
+            **base,
+            **{key: value for key, value in row.items() if value is not None},
+        }
+    history_rows = [merged[key] for key in sorted(merged)]
     recovery_history = [_snapshot_from_row(row) for row in history_rows]
 
     return (
@@ -86,6 +102,7 @@ def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWork
 
 
 def create_personal_recommendation(payload: DailyCheckInInput) -> PersonalRecommendationResponse:
+    payload = enrich_with_apple_health(payload)
     if payload.planned_activity_type != PlannedActivityType.run:
         calculated_load = calculate_recent_load_ratio(payload.athlete_id, payload.checkin_date)
         try:
