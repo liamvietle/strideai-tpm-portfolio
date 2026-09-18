@@ -98,7 +98,7 @@ EXTRA_SCRIPT = r'''
   function updateMode(){
     const type=activity.value;const run=type==='run';const rest=type==='rest';const cycling=type==='cycling';
     distanceField.style.display=(run||cycling)?'':'none';intensityField.style.display=rest?'none':'';decisionField.style.display=run?'':'none';noteField.style.display=run?'none':'';
-    $('planned_distance_km').required=run;$('human_decision').required=run;
+    $('planned_distance_km').min=run?'0.1':'0';$('planned_distance_km').required=run;$('human_decision').required=run;
     if(run){$('planned_distance_km').min='0.1';setOptions(['easy','moderate','threshold','interval','race']);$('recommendBtn').textContent='Get today’s guidance'}
     else if(rest){$('planned_distance_km').value='0';$('recommendBtn').textContent='Save recovery check-in'}
     else{if(!cycling)$('planned_distance_km').value='0';setOptions(['easy','moderate','hard']);$('recommendBtn').textContent='Save recovery + planned activity'}

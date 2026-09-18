@@ -10,6 +10,12 @@ await page.getByRole('heading',{name:'Make the plan fit your life'}).waitFor();
 for(const c of await page.locator('[name=availableDay]').all())await c.check();
 await page.screenshot({path:'/tmp/strideai-setup-mobile.png',fullPage:true});
 await page.locator('#ap_age').fill('33');await page.locator('#ap_recent_weekly_km').fill('30');
+if(process.env.MODE==='strength'){
+const profile=await (await page.request.get('http://127.0.0.1:8765/app/api/coach/profile')).json();
+const weekday=(new Date(profile.today+'T12:00:00Z').getUTCDay()+6)%7;
+await page.locator(`[name=availableDay][value="${weekday}"]`).uncheck();
+await page.locator('#addStrength').check();await page.locator(`[name=strengthDay][value="${weekday}"]`).check();
+}
 await page.getByRole('button',{name:'Save and continue',exact:true}).click();
 await page.getByRole('heading',{name:'Bring your training history'}).waitFor();
 await page.reload();await page.getByRole('heading',{name:'Bring your training history'}).waitFor();
@@ -28,6 +34,18 @@ await page.getByRole('button',{name:'Finish setup',exact:true}).click();
 }
 await page.locator('.journey-nav').waitFor();
 if(await page.locator('.journey-nav button:visible').count()!==4)throw Error('Expected four navigation choices');
+if(process.env.MODE==='strength'){
+await page.waitForFunction(()=>document.getElementById('coachToday').textContent.includes('No run scheduled'));
+await page.locator('#coachTodayOpen').click();
+await page.getByText('30 minutes strength · no run scheduled',{exact:true}).waitFor();
+if(await page.getByRole('button',{name:'Lock pre-run expectation',exact:true}).count())throw Error('Strength must not offer a running prediction');
+await page.getByRole('button',{name:'Today',exact:true}).click();await page.locator('#journeyCheckinButton').click();
+if(await page.locator('#planned_activity_type').inputValue()!=='strength')throw Error('Expected strength check-in');
+await page.locator('#planned_activity_type').selectOption('tennis');await page.locator('#planned_intensity').selectOption('easy');await page.locator('#planned_activity_note').fill('Tennis and 30 minutes strength');
+await page.locator('#sleep_hours').fill('08:00');await page.locator('#recommendBtn').click();
+await page.waitForFunction(()=>/saved|locked/i.test(document.getElementById('submitStatus').textContent));
+if(errors.length)throw Error(errors.join('; '));console.log('Strength-only setup, plan display and tennis check-in passed');await browser.close();return;
+}
 await page.locator('#journeyCheckinButton').click();if(process.env.MODE==='import')await page.locator('#planned_intensity').selectOption('easy');await page.locator('#sleep_hours').fill('08:00');await page.locator('#recommendBtn').click();await page.waitForFunction(()=>document.getElementById('submitStatus').textContent.includes('Decision locked'));
 await page.getByRole('button',{name:'Training',exact:true}).click();await page.locator('#coachDays button').first().click();await page.locator('#coachDetail').waitFor();
 await page.getByRole('button',{name:'Lock pre-run expectation',exact:true}).click();

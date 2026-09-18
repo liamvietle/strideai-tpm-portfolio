@@ -622,3 +622,26 @@ def test_completed_race_updates_forecast_but_easy_run_does_not(monkeypatch):
     assert race_prediction()['predicted_seconds'] == 14400
     observation['execution']['completed'] = False
     assert race_prediction()['status'] == 'unavailable'
+
+
+def test_strength_on_non_running_tuesday():
+    from app.athlete_coach import cut
+    from app.training_plan import plan_progress
+    setup()
+    store.patch_profile({'available_days': [0, 3, 5, 6], 'long_run_day': 5,
+                         'include_strength': True, 'strength_days': [1]})
+    generate(GeneratePlan(start_mode='today', replace_existing=True), 'viet')
+    sessions = [r['current'] for r in workouts()]
+    tuesdays = [w for w in sessions if date.fromisoformat(w['date']).weekday() == 1]
+    strength = [w for w in tuesdays if w['strength_session']]
+    assert strength
+    assert all(w['distance_km'] == 0 and w['duration_minutes'] == 0 for w in strength)
+    assert all(w['strength_minutes'] == 30 and w['pace_target'] is None for w in strength)
+    assert all(w['kind'] != 'long' for w in tuesdays)
+    snapshot = plan_progress()['days']
+    assert all(next(d for d in snapshot if d['date'] == w['date'])['activity'] == 'other' for w in strength)
+    stopped = cut(strength[0], 0)
+    assert not stopped['strength_session'] and stopped['strength_minutes'] == 0
+    store.patch_profile({'active_injury': True})
+    generate(GeneratePlan(start_mode='today', replace_existing=True), 'viet')
+    assert not any(w['current']['strength_session'] for w in workouts())

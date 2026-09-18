@@ -47,6 +47,9 @@ def cut(w, factor, easy=False):
     }
     if factor == 0:
         result.update(
+            strength_session=False,
+            strength_minutes=0,
+            strength_instructions=None,
             kind="rest",
             key_session=False,
             pace_target=None,
@@ -679,7 +682,7 @@ def evaluate(wid, athlete):
             )
             for r in future:
                 future_w = json.loads(r["current_json"])
-                if future_w["kind"] == "rest":
+                if future_w["kind"] == "rest" and not (x["pain"] and future_w.get("strength_session")):
                     continue
                 revised = cut(future_w, 0 if x["pain"] else 0.85, easy=True)
                 reason = (

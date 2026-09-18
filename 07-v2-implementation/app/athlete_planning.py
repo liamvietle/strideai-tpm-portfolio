@@ -206,6 +206,9 @@ def generate(payload, athlete):
         w['strength_minutes'] = min(30, max(0, p.max_session_minutes - w['duration_minutes'])) if w['strength_session'] else 0
         w['strength_session'] = w['strength_minutes'] >= 10
         w['strength_instructions'] = 'Optional familiar runner-strength exercises at comfortable effort; stop with pain. Omitted in race week and during active injury.' if w['strength_session'] else None
+        if w["strength_session"] and w["distance_km"] == 0:
+            w["purpose"] = "Strength training; no run scheduled"
+            w["instructions"] = "Keep the effort comfortable. If also playing tennis or another sport, account for that effort and shorten or skip strength if tired."
         result.append(w)
     with connect() as c:
         c.execute("BEGIN IMMEDIATE")
@@ -252,7 +255,7 @@ def generate(payload, athlete):
                 PlanDay(
                     date=w["date"],
                     distance_km=w["distance_km"],
-                    activity="rest" if w["kind"] == "rest" else "run",
+                    activity=("other" if w.get("strength_session") else "rest") if w["kind"] == "rest" else "run",
                     note=w["purpose"],
                 )
                 for w in snapshot
