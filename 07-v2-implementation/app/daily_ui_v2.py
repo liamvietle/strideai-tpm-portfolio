@@ -47,6 +47,7 @@ FORM_HANDLER = r'''document.addEventListener('submit',async e=>{
     if(d.mode==='recovery_only_checkin'){
       $('result').classList.remove('show');$('submitStatus').textContent=d.message;
       const toast=$('toast');toast.textContent='Recovery check-in saved';toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2400);
+      window.dispatchEvent(new Event('strideai:checkin-saved'));
       return;
     }
     $('action').textContent=pretty(d.recommendation.action);
@@ -98,7 +99,7 @@ EXTRA_SCRIPT = r'''
     const type=activity.value;const run=type==='run';const rest=type==='rest';const cycling=type==='cycling';
     distanceField.style.display=(run||cycling)?'':'none';intensityField.style.display=rest?'none':'';decisionField.style.display=run?'':'none';noteField.style.display=run?'none':'';
     $('planned_distance_km').required=run;$('human_decision').required=run;
-    if(run){$('planned_distance_km').min='0.1';setOptions(['easy','moderate','threshold','interval','race']);$('recommendBtn').textContent='Lock my decision & get StrideAI'}
+    if(run){$('planned_distance_km').min='0.1';setOptions(['easy','moderate','threshold','interval','race']);$('recommendBtn').textContent='Get today’s guidance'}
     else if(rest){$('planned_distance_km').value='0';$('recommendBtn').textContent='Save recovery check-in'}
     else{if(!cycling)$('planned_distance_km').value='0';setOptions(['easy','moderate','hard']);$('recommendBtn').textContent='Save recovery + planned activity'}
   }

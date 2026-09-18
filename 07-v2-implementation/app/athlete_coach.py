@@ -265,7 +265,8 @@ def predict(wid, athlete):
         prior = [
             o
             for o in obs
-            if o["date"] < row["date"]
+            if target["kind"] != "custom"
+            and o["date"] < row["date"]
             and o["workout"]["kind"] == target["kind"]
             and o["evaluation"].get("actual_pace")
             and not o["execution"]["pain"]

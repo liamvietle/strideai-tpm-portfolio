@@ -10,6 +10,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from app.accumulated_fatigue import evaluate_workout_v21
 from app.activity_weather import enrich_weather, recent_activities
 from app.dashboard import DASHBOARD_HTML
+from app.journey import router as journey_router
+from app.journey_ui import enhance_journey_ui
 from app.engine import evaluate_workout
 from app.explanation import build_evidence_package, generate_explanation
 from app.ingestion import parse_garmin_summary_csv, parse_tcx
@@ -109,6 +111,8 @@ def root() -> RedirectResponse:
     return RedirectResponse(url="/app")
 
 
+app.include_router(journey_router)
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -116,7 +120,7 @@ def health() -> dict[str, str]:
 
 @app.get("/app", response_class=HTMLResponse, include_in_schema=False)
 def personal_app() -> str:
-    return enhance_athlete_ui(enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML)))
+    return enhance_journey_ui(enhance_athlete_ui(enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML))))
 
 
 @app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
