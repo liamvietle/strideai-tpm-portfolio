@@ -10,6 +10,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from app.accumulated_fatigue import evaluate_workout_v21
 from app.activity_weather import enrich_weather, recent_activities
 from app.dashboard import DASHBOARD_HTML
+from app import accounts
+from app.account_ui import LOGIN_HTML, with_account_ui
 from app.journey import router as journey_router
 from app.journey_ui import enhance_journey_ui
 from app.engine import evaluate_workout
@@ -79,6 +81,7 @@ app = FastAPI(
 )
 
 app.include_router(athlete_router)
+app.include_router(accounts.router)
 
 APP_KEY = os.getenv("STRIDEAI_APP_KEY", "").strip()
 PUBLIC_PATHS = {"/", "/app", "/privacy", "/health", "/app/api/strava/callback"}
@@ -91,6 +94,10 @@ async def optional_personal_access_key(request: Request, call_next):
     The app shell, health endpoint and OAuth callback stay public. The callback
     is protected by a short-lived one-time OAuth state stored in SQLite.
     """
+    if accounts.enabled():
+        return await accounts.protect(request, call_next)
+    if request.url.path.startswith("/auth/"):
+        return JSONResponse(status_code=404, content={"detail": "Account login is not enabled."})
     if APP_KEY and request.url.path not in PUBLIC_PATHS:
         supplied = request.headers.get("X-StrideAI-Key", "")
         if not hmac.compare_digest(supplied, APP_KEY):
@@ -119,8 +126,15 @@ def health() -> dict[str, str]:
 
 
 @app.get("/app", response_class=HTMLResponse, include_in_schema=False)
-def personal_app() -> str:
-    return enhance_journey_ui(enhance_athlete_ui(enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML))))
+def personal_app(request: Request = None) -> str:
+    html = enhance_journey_ui(enhance_athlete_ui(enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML))))
+
+    return with_account_ui(html, request.state.account) if accounts.enabled() and request else html
+
+
+@app.get("/login", response_class=HTMLResponse, include_in_schema=False)
+def login_page():
+    return LOGIN_HTML if accounts.enabled() else RedirectResponse("/app")
 
 
 @app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)

@@ -293,3 +293,5 @@ A growing prospective failure/override set is more valuable now than adding agen
 ## Athlete coaching loop
 
 The Athlete, Coach and Review tabs add profile-based planning, saved pre-run expectations, execution/outcome comparisons, bounded athlete learning and living-plan revisions. See [ATHLETE-LOOP.md](ATHLETE-LOOP.md) for the workflow, additive migration, AI configuration and current limitations.
+
+Account login and per-athlete isolation: see [ACCOUNTS.md](ACCOUNTS.md) for the opt-in rollout and recovery procedure.
