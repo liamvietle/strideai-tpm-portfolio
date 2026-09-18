@@ -60,6 +60,15 @@ from app.plan_ui import enhance_plan_ui
 from app.athlete_api import router as athlete_router
 from app.athlete_store import init_athlete_db
 from app.athlete_ui import enhance_athlete_ui
+from app.apple_health import (
+    AppleHealthSyncInput,
+    AppleHealthSyncResult,
+    apple_health_status,
+    daily_state as apple_health_daily_state,
+    delete_apple_health,
+    init_apple_health_db,
+    upsert_apple_health,
+)
 
 app = FastAPI(
     title="StrideAI",
@@ -92,6 +101,7 @@ def initialize() -> None:
     init_personal_app_db()
     init_strava_db()
     init_athlete_db()
+    init_apple_health_db()
 
 
 @app.get("/", include_in_schema=False)
@@ -215,6 +225,34 @@ def get_recent_activities(
     athlete_id: str = "viet", limit: int = Query(default=30, ge=1, le=100),
 ) -> list[dict]:
     return recent_activities(athlete_id, limit)
+
+
+@app.post("/app/api/apple-health/sync", response_model=AppleHealthSyncResult)
+def sync_apple_health(payload: AppleHealthSyncInput) -> AppleHealthSyncResult:
+    return upsert_apple_health(payload)
+
+
+@app.get("/app/api/apple-health/status")
+def get_apple_health_status(athlete_id: str = "viet") -> dict:
+    return apple_health_status(athlete_id)
+
+
+@app.get("/app/api/apple-health/daily-state")
+def get_apple_health_daily_state(
+    health_date: str = Query(alias="date", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    athlete_id: str = "viet",
+) -> dict:
+    try:
+        state = apple_health_daily_state(athlete_id, health_date)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid health summary date.") from exc
+    return {"available": state is not None, "state": state}
+
+
+@app.delete("/app/api/apple-health/data")
+def remove_apple_health_data(athlete_id: str = "viet") -> dict[str, int | bool]:
+    deleted = delete_apple_health(athlete_id)
+    return {"deleted": deleted, "disconnected": True}
 
 
 @app.post("/v1/recommendations", response_model=CoachingRecommendation)

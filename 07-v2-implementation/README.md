@@ -188,6 +188,21 @@ http://127.0.0.1:8000/dashboard
 
 ## Real activity ingestion
 
+### Apple Health recovery sync
+
+The companion app in [`../08-ios-companion`](../08-ios-companion/README.md) reads Sleep Analysis, Resting Heart Rate and HRV SDNN on iPhone. It sends privacy-minimized daily summaries to:
+
+```text
+POST /app/api/apple-health/sync
+GET  /app/api/apple-health/status
+GET  /app/api/apple-health/daily-state?date=YYYY-MM-DD
+DELETE /app/api/apple-health/data
+```
+
+The coaching workflow fills missing daily recovery fields from these summaries and includes synced days in the rolling seven-day recovery history even when no manual check-in was made. HRV baseline bounds use the 10th and 90th percentiles of up to 28 prior daily medians, with at least seven observations required.
+
+Raw HealthKit samples are aggregated on the iPhone and are not uploaded.
+
 Import a Garmin or Strava TCX file locally:
 
 ```bash

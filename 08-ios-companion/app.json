@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "StrideAI Health",
+    "slug": "strideai-health",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vietle.strideai.health"
+    },
+    "plugins": [
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "StrideAI reads sleep, resting heart rate, and HRV to prepare your daily running recovery assessment.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ],
+      "expo-secure-store"
+    ]
+  }
+}

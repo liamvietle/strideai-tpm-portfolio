@@ -15,13 +15,14 @@ footer{border-top:1px solid #dce6e8;margin-top:32px;padding-top:20px}@media(max-
 </style></head><body><main>
 <a class="brand" href="/app">StrideAI</a>
 <h1>Privacy policy</h1>
-<p class="meta">Effective date: 17 September 2026</p>
+<p class="meta">Effective date: 18 September 2026</p>
 <p class="intro">StrideAI is an early-stage personal running-coach application operated by Viet Le in Vietnam. This notice explains how information is handled when you use StrideAI at stride-ai.app.</p>
 <h2>Information we handle</h2>
 <ul>
 <li><strong>Training and recovery inputs:</strong> athlete identifier, race goals, training plans, workout dates, distance and intensity, sleep, heart-rate variability, resting heart rate, soreness, pain indicators, fatigue, training decisions, and outcome notes you provide.</li>
 <li><strong>Connected activities:</strong> after you authorize Strava, we receive your Strava athlete identifier and name, authorization tokens and permissions, and activity summaries. These can include activity names and types, dates, distance, duration, heart rate, elevation, cadence, and location or route information included in the source summary. Private activities are included if you grant that permission. Activity summaries are stored for training-history and recovery features.</li>
 <li><strong>Uploaded activities:</strong> information parsed from Garmin CSV or TCX files you choose to upload. Direct Garmin Connect API access is not currently enabled.</li>
+<li><strong>Apple Health recovery summaries:</strong> after you grant read permission in the StrideAI iPhone companion, the companion reads sleep analysis, resting heart rate and heart-rate variability (SDNN). It combines those samples on your phone and sends daily summary values, sample counts, dates, time zone and source names to StrideAI. StrideAI does not request permission to write to Apple Health and does not upload raw HealthKit samples.</li>
 <li><strong>Generated information:</strong> load calculations, recovery assessments, recommendations, explanations, weather context, outcome comparisons, and diagnostic records.</li>
 <li><strong>Technical and contact information:</strong> your browser sends ordinary request information, including IP address and browser details, to the hosting service. If you contact us, we receive your email address and message.</li>
 </ul>
@@ -41,7 +42,7 @@ footer{border-top:1px solid #dce6e8;margin-top:32px;padding-top:20px}@media(max-
 <p>Training records and connection details are stored in the application's database. Access to personal API data is restricted by the deployment's access key; website connections use HTTPS. No storage or transmission method can guarantee absolute security.</p>
 <p>The current personal deployment has no automatic expiry for stored training records. Records remain until the operator removes them. Retention is reviewed when you request deletion or stop using the service, taking into account maintaining requested training history, resolving support or security issues, and any applicable legal obligations. There is no self-service account deletion screen.</p>
 <h2>Your choices and requests</h2>
-<p>You can stop uploading or entering information, disconnect Strava in the app, and revoke authorization in Strava's own settings. Disconnecting in StrideAI removes stored connection tokens but does not automatically delete previously imported activities or recommendations.</p>
+<p>You can stop uploading or entering information, disconnect Strava in the app, and revoke authorization in Strava's own settings. You can revoke StrideAI's Apple Health permissions in the Health app and delete stored Apple Health summaries through the protected StrideAI API. Disconnecting or revoking authorization stops future access but does not automatically delete previously imported activities or recommendations.</p>
 <p>Contact Viet Le to request access, a copy, correction or deletion of your stored information, or to raise a privacy concern. We may ask for enough information to verify the request. Depending on your location and applicable law, you may also have rights to restrict or object to processing, withdraw consent, or complain to a privacy regulator. Withdrawing authorization stops future access but does not itself erase previously stored data.</p>
 <h2>Browser storage</h2>
 <p>If you save an access key, StrideAI stores it in your browser's local storage and sends it to the app with protected requests. You can remove it by clearing the key in the app or clearing site data in your browser. This deployment does not include advertising trackers or third-party analytics scripts.</p>
