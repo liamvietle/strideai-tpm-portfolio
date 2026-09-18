@@ -134,3 +134,25 @@ Without a recent dated performance anchor the forecast stays unavailable.
 The forecast refreshes on Coach entry, profile save and workout evaluation, with daily
 snapshots in the existing coach_race_forecasts table. No new migration or environment
 variable is required. Goal time remains separate and never drives the estimate.
+
+### Guided first-time experience
+
+The app now has four primary destinations: Today, Training, Progress, and You.
+A three-step setup reuses the existing profile, connection and plan forms. Setup
+progress is stored per athlete in the additive `athlete_setup` table, created
+idempotently by the journey API. Existing athletes with check-ins or a saved plan
+start on Today; they can reopen setup from You. Setup can be deferred without
+inventing profile values. Access-key errors show the existing key entry form.
+
+New endpoints under `/app/api/journey` read/write setup progress and activate an
+imported plan. Activation copies future running sessions from the reviewed plan
+snapshot into coaching, preserving instructions and distance. Intensity and target
+pace/HR/RPE remain unknown; a duration estimate is labeled as provisional. Rest
+and non-running sessions stay in the imported calendar and use existing recovery
+check-ins. Activation refuses to overwrite an existing future coaching plan.
+Imports currently accept pasted dated rows or a `.txt` file in the displayed
+format, not arbitrary PDF or spreadsheet interpretation.
+
+No new environment variables or AI changes. The existing app-key access model
+remains; this redesign does not add public multi-user signup. New profile identity
+and onboarding permissions would need a separate account/authentication phase.
