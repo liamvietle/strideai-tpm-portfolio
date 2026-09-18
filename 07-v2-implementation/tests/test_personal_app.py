@@ -158,3 +158,17 @@ def test_personal_app_shell_has_daily_recovery_controls(monkeypatch, tmp_path: P
     assert "Rest / recovery day" in response.text
     assert "Sleep (HH:MM)" in response.text
     assert "Auto from Strava running history" in response.text
+
+
+def test_race_days_are_derived_and_soreness_guardrail_remains(monkeypatch, tmp_path):
+    from datetime import date
+    from app.training_plan import RaceGoal, save_goal
+    from app.accumulated_fatigue import evaluate_workout_v21
+    monkeypatch.setenv('STRIDEAI_DB_PATH', str(tmp_path/'simple.db'))
+    save_goal(RaceGoal(name='Target',race_date=date(2026,12,20),goal_minutes=230))
+    data,_=build_accumulated_input(_payload('2026-12-18',days_until_event=None,soreness_0_10=8))
+    assert data.days_until_event==2
+    decision,_=evaluate_workout_v21(data)
+    assert decision.action.value=='recovery_only'
+    other,_=build_accumulated_input(_payload('2026-12-18',athlete_id='another',days_until_event=None))
+    assert other.days_until_event is None

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time
 from typing import Literal
 from zoneinfo import ZoneInfo
 
@@ -14,6 +14,22 @@ from app.personal_history import list_personal_history
 from app.storage import connect, init_db
 
 
+class RaceLocation(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    timezone: str
+
+    @field_validator('timezone')
+    @classmethod
+    def valid_zone(cls, value):
+        try:
+            ZoneInfo(value)
+        except (KeyError, ValueError):
+            raise ValueError('Choose a valid location time zone.')
+        return value
+
+
 class RaceGoal(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     race_date: date
@@ -21,6 +37,8 @@ class RaceGoal(BaseModel):
     goal_minutes: float = Field(gt=0, le=10000, allow_inf_nan=False)
     timezone: str = 'Asia/Ho_Chi_Minh'
     new_race: bool = False
+    location: RaceLocation | None = None
+    start_time: time | None = None
 
     @field_validator('timezone')
     @classmethod

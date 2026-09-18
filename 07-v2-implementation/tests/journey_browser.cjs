@@ -5,6 +5,10 @@ for(let i=0;i<60;i++){try{await fetch('http://127.0.0.1:8765/health');break}catc
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE,args:['--no-sandbox','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:390,height:844}}), errors=[];
 page.on('pageerror',e=>{errors.push(e.message);console.error(e.stack);});
+if(process.env.MODE==='weather'){
+await page.route('**/app/api/weather/places?*',route=>route.fulfill({json:[{name:'Taipei, Taiwan',latitude:25.03,longitude:121.56,timezone:'Asia/Taipei'}]}));
+await page.route('**/app/api/coach/race-prediction',route=>route.fulfill({json:{status:'unavailable',reason:'Add a dated PB',weather:{summary:'Historical seasonal conditions, not a race-day forecast'}}}));
+}
 await page.goto('http://127.0.0.1:8765/app');
 await page.getByRole('heading',{name:'Make the plan fit your life'}).waitFor();
 for(const c of await page.locator('[name=availableDay]').all())await c.check();
@@ -22,7 +26,14 @@ await page.reload();await page.getByRole('heading',{name:'Bring your training hi
 await page.getByRole('button',{name:'Continue to plan',exact:true}).click();
 await page.getByRole('heading',{name:'Choose how you want to train'}).waitFor();
 const today=await page.locator('#coachStart').inputValue();const end=new Date(today+'T12:00:00Z');end.setUTCDate(end.getUTCDate()+90);
-await page.locator('#raceName').fill('My first plan');await page.locator('#raceDate').fill(end.toISOString().slice(0,10));await page.locator('#raceTime').fill('04:00');await page.locator('#goalForm button').click();await page.waitForFunction(()=>document.getElementById('goalStatus').textContent.includes('saved'));
+if(process.env.MODE==='weather'){
+await page.locator('#raceCity').fill('Taipei');await page.locator('#raceFind').click();await page.locator('#racePlace').selectOption('0');await page.locator('#raceStart').fill('06:30');
+}
+await page.locator('#raceName').fill('My first plan');await page.locator('#raceDate').fill(end.toISOString().slice(0,10));await page.locator('#raceTime').fill('04:00');await page.getByRole('button',{name:'Save race goal',exact:true}).click();await page.waitForFunction(()=>document.getElementById('goalStatus').textContent.includes('saved'));
+if(process.env.MODE==='weather'){
+const saved=await (await page.request.get('http://127.0.0.1:8765/app/api/plan')).json();
+if(saved.goal.location.timezone!=='Asia/Taipei'||saved.goal.start_time!=='06:30:00')throw Error('Race location/start did not persist');
+}
 if(process.env.MODE==='import'){
 await page.locator('#coachGenerate').click();await page.waitForFunction(()=>document.getElementById('coachStatus').textContent.includes('sessions generated'));
 await page.getByRole('button',{name:/I already have a plan/}).click();
@@ -50,7 +61,7 @@ await page.locator('#sleep_hours').fill('08:00');await page.locator('#recommendB
 await page.waitForFunction(()=>/saved|locked/i.test(document.getElementById('submitStatus').textContent));
 if(errors.length)throw Error(errors.join('; '));console.log('Strength-only setup, plan display and tennis check-in passed');await browser.close();return;
 }
-await page.locator('#journeyCheckinButton').click();if(process.env.MODE==='import')await page.locator('#planned_intensity').selectOption('easy');await page.locator('#sleep_hours').fill('08:00');await page.locator('#recommendBtn').click();await page.waitForFunction(()=>document.getElementById('submitStatus').textContent.includes('Decision locked'));
+await page.locator('#journeyCheckinButton').click();if(await page.locator('#days_until_event').isVisible()||await page.locator('#soreness_0_10').isVisible())throw Error('Removed check-in fields visible');if(await page.locator('#hrv_ms').isVisible())throw Error('Optional health fields should be collapsed');if(process.env.MODE==='import')await page.locator('#planned_intensity').selectOption('easy');if(process.env.MODE==='weather')await page.locator('#subjective_fatigue').selectOption('sore');await page.locator('#sleep_hours').fill('08:00');await page.screenshot({path:'/tmp/strideai-simple-checkin.png',fullPage:true});await page.locator('#recommendBtn').click();await page.waitForFunction(()=>document.getElementById('submitStatus').textContent.includes('Decision locked'));if(process.env.MODE==='weather'){const h=await (await page.request.get('http://127.0.0.1:8765/app/api/history?limit=1')).json();if(h[0].soreness_0_10!==5)throw Error('Combined soreness selection not recorded');}
 await page.getByRole('button',{name:'Training',exact:true}).click();await page.locator('#coachDays button').first().click();await page.locator('#coachDetail').waitFor();
 await page.getByRole('button',{name:'Lock pre-run expectation',exact:true}).click();
 await page.getByRole('button',{name:'Accept adjustment',exact:true}).click();
