@@ -673,3 +673,33 @@ def test_combined_strain_only_changes_next_run():
     change = result['next_changes'][0]
     assert change['after_km'] == round(change['before_km']*.9,2)
     assert evaluate(w['id'],'viet') == result
+
+
+def test_prediction_locks_latest_checkin_distance():
+    w=setup()
+    check()
+    with connect() as c:
+        c.execute("UPDATE daily_checkins SET planned_distance_km=8 WHERE athlete_id='viet'")
+    p=predict(w['id'],'viet')
+    assert p['planned']['distance_km']==8
+    assert workouts()[0]['current']['distance_km']==8
+    with connect() as c:
+        c.execute("UPDATE daily_checkins SET planned_distance_km=10 WHERE athlete_id='viet'")
+    assert predict(w['id'],'viet')['planned']['distance_km']==8
+
+
+def test_legacy_comparison_recovers_swapped_target_from_audit():
+    from app.athlete_coach import change
+    w=setup()
+    with connect() as c:
+        row=store.workout(c,w['id'],'viet')
+        revised=dict(w['current'],distance_km=8,duration_minutes=48)
+        change(c,row,revised,'Availability swap',None)
+    execute(w['id'],Execution(distance_km=7.2,duration_seconds=3000,completed=True),'viet')
+    with connect() as c:
+        x=json.loads(c.execute('SELECT execution_json FROM coach_executions WHERE workout_id=?',(w['id'],)).fetchone()[0])
+        x.pop('target_snapshot')
+        c.execute('UPDATE coach_executions SET execution_json=? WHERE workout_id=?',(json.dumps(x),w['id']))
+    rows=workouts()
+    distance=next(m for m in rows[0]['comparison_metrics'] if m['metric']=='Distance')
+    assert distance['expected']==8 and distance['difference']==-.8

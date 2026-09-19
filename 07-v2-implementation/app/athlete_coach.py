@@ -154,6 +154,19 @@ def predict(wid, athlete):
         raise HTTPException(
             409, "Recovery day: use the daily check-in; no run prediction is needed."
         )
+    # A later check-in can revise today's intention; a later calendar swap wins
+    # over an older check-in. Neither can rewrite an already locked prediction.
+    with connect() as c:
+        check_is_latest = c.execute("SELECT julianday(?) >= COALESCE(MAX(julianday(created_at)),0) FROM coach_plan_changes WHERE athlete_id=? AND workout_id=?",
+                                    (check['updated_at'], athlete, wid)).fetchone()[0]
+    if check_is_latest and check.get('planned_activity_type', 'run') == 'run' and check['planned_distance_km'] != w['distance_km']:
+        if w.get('segments'):
+            raise HTTPException(409, 'Update the structured session in your plan before locking a different distance.')
+        if check['planned_distance_km'] <= 0:
+            raise HTTPException(409, 'No running distance in this check-in. Update it before locking expectations.')
+        w = cut(w, check['planned_distance_km'] / w['distance_km'])
+        w['intent_source'] = 'Pre-run check-in'
+        w['kind'] = check.get('planned_intensity') or w['kind']
     state = {
         k: check[k]
         for k in [
@@ -177,7 +190,7 @@ def predict(wid, athlete):
         planned_distance_km=w["distance_km"],
         planned_intensity="threshold"
         if w["kind"] == "threshold"
-        else ("race" if w["kind"] == "race" else "easy"),
+        else ("race" if w["kind"] == "race" else (check["planned_intensity"] if w["kind"] == "custom" else "easy")),
         human_decision="maintain",
         **state,
     )
@@ -265,51 +278,12 @@ def predict(wid, athlete):
     # Expectations are for the ORIGINAL session as well as the selected session.
     # This permits an honest comparison if the athlete declines a safe reduction.
     def expectation(target):
-        prior = [
-            o
-            for o in obs
-            if target["kind"] != "custom"
-            and o["date"] < row["date"]
-            and o["workout"]["kind"] == target["kind"]
-            and o["evaluation"].get("actual_pace")
-            and not o["execution"]["pain"]
-            and 0.8
-            <= target["distance_km"] / max(o["execution"]["distance_km"], 0.1)
-            <= 1.2
-        ]
-        if len(prior) >= 3:
-            pace = median([o["evaluation"]["actual_pace"] for o in prior[-12:]])
-            hrs = [
-                o["execution"]["average_hr"]
-                for o in prior[-12:]
-                if o["execution"].get("average_hr")
-            ]
-            effort = [
-                o["execution"]["rpe"]
-                for o in prior[-12:]
-                if o["execution"].get("rpe") is not None
-            ]
-            return {
-                "pace": round(pace, 1),
-                "hr": round(median(hrs), 1) if hrs else None,
-                "rpe": round(median(effort), 1) if effort else None,
-                "samples": len(prior),
-                "basis": "Comparable evaluated sessions",
-                "quality": "completion_expected" if fatigue.score <= 2 else "uncertain",
-            }
-        # Mixed sessions have segment targets but no defensible whole-run pace prediction yet.
-        return {
-            "pace": mean(target["pace_target"])
-            if target.get("pace_target") and target["kind"] not in {"threshold", "race"}
-            else None,
-            "hr": mean(target["hr_target"])
-            if target.get("hr_target") and target["kind"] not in {"threshold", "race"}
-            else None,
-            "rpe": mean(target["rpe_target"]) if target.get("rpe_target") else None,
-            "samples": 0,
-            "basis": "Provisional target-based estimate; not yet calibrated",
-            "quality": "uncertain",
-        }
+        from app.historical_expectation import estimate
+        result = estimate(target, row["date"], store.runs(athlete), obs,
+                          p.max_hr, check.get("planned_intensity"))
+        if fatigue.score > 2:
+            result["limitations"].append("Today’s recovery signals reduce confidence; review the recommended workout targets.")
+        return result
 
     with connect() as c:
         effects = week_effect(c, row, selected_workout)
@@ -352,6 +326,7 @@ def predict(wid, athlete):
             or not current["active"]
         ):
             raise HTTPException(409, "Plan changed; reload before predicting.")
+        change(c, current, w, "Workout intention saved with pre-run expectation", wid)
         c.execute(
             "INSERT INTO coach_predictions VALUES(?,?,?,?)",
             (wid, check["recommendation_id"], json.dumps(result), result["created_at"]),

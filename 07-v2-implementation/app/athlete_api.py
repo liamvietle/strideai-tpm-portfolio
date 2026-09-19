@@ -75,7 +75,7 @@ def workouts(athlete_id: str = "viet"):
     store.init_athlete_db()
     with connect() as c:
         rows = c.execute(
-            """SELECT w.*,p.prediction_json,d.choice,x.execution_json,e.evaluation_json
+            """SELECT w.*,p.prediction_json,d.choice,x.execution_json,x.created_at AS execution_created_at,e.evaluation_json
             FROM coach_workouts w LEFT JOIN coach_predictions p ON p.workout_id=w.id
             LEFT JOIN coach_decisions d ON d.workout_id=w.id
             LEFT JOIN coach_executions x ON x.workout_id=w.id
@@ -94,6 +94,13 @@ def workouts(athlete_id: str = "viet"):
             r["prediction"].pop("context", None)
         if r["execution"]:
             from app.workout_comparison import comparison_metrics
+            if not r["execution"].get("target_snapshot"):
+                with connect() as c:
+                    historical = c.execute("""SELECT after_json FROM coach_plan_changes
+                        WHERE athlete_id=? AND workout_id=? AND julianday(created_at)<=julianday(?)
+                        ORDER BY julianday(created_at) DESC,id DESC LIMIT 1""",
+                        (athlete_id,r['id'],r['execution_created_at'])).fetchone()
+                r['execution_target'] = json.loads(historical[0]) if historical else r['original']
             r["comparison_metrics"] = comparison_metrics(r)
         result.append(r)
     return result

@@ -121,6 +121,7 @@ def runs(athlete):
             if r.get("duration_seconds") and r.get("distance_km")
             else None
         )
+        r["session_kind"] = "race" if r.get("source") == "strava" and raw.get("workout_type") == 1 else None
         effort = raw.get("perceived_exertion") if r.get("source") == "strava" else None
         # Opportunistic only: Strava does not document this as a stable API field.
         r["rpe"] = effort if type(effort) in (int, float) and 1 <= effort <= 10 else None
