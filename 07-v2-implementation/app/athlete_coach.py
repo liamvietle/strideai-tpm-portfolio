@@ -562,7 +562,7 @@ def evaluate(wid, athlete):
             a, b = splits[:half], splits[half:]
             # Report decoupling only for steady sessions with complete HR and stable pace.
             if (
-                w["kind"] in {"easy", "long"}
+                target["kind"] in {"easy", "long"}
                 and consistency <= 10
                 and all(s["average_hr"] for s in splits)
             ):

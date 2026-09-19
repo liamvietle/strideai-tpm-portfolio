@@ -133,7 +133,8 @@ else if(w?.current.distance_km===0){$('coachToday').textContent=checked?'Recover
 else if(w){$('coachToday').textContent=`${w.current.distance_km} km · ${w.current.purpose}. ${w.evaluation?'Session reviewed. See what you learned.':w.execution?'Your run is saved. Review the result.':w.prediction?'Your targets are ready. Review them before training.':checked?'Check-in saved. View your workout to set execution targets.':'Start with a recovery check-in, then review your workout targets.'}`;}
 else{$('coachToday').textContent=own?`${own.activity==='rest'?'Recovery day':own.activity==='other'?'Non-running session':own.distance_km+' km run'} · ${own.note||'Your plan'}`:plan.days?.length?'No session scheduled today. Rest or check in with what you choose to do.':'You can check in today, or use guided setup to choose your training plan.';}
 homeAction.onclick=()=>{checkFold.open=true;const session=w?.current;if(session||own){$('checkin_date').value=profile.today;$('planned_activity_type').value=session?(session.distance_km>0?'run':session.strength_session?'strength':'rest'):own.activity;$('planned_activity_type').dispatchEvent(new Event('change'));$('planned_intensity').required=false;$('planned_distance_km').value=session?.distance_km??own.distance_km;$('planned_activity_note').value=(session?.purpose||own.note||'').slice(0,200);if(session?.kind==='custom'){const option=make('option','Choose intensity from your plan');option.value='';$('planned_intensity').prepend(option);$('planned_intensity').value='';$('planned_intensity').required=true;}else $('planned_intensity').value=session?.kind==='threshold'?'threshold':session?.kind==='race'?'race':'easy';}$('sleep_hours').focus();};
-const running=!!w&&w.original.distance_km>0;
+const running=!!w&&(w.current.distance_km>0||!!w.execution||!!w.prediction);
+renderSessionChange(w,workouts,profile.today);
 const stage=w?.evaluation?'review':w?.execution?'review':!checked?'checkin':!w?.prediction||!w?.choice?'prepare':'execute';
 if(stage==='execute'&&lastStage!==stage){dailyOpen=false;$('coachDetail').hidden=true;}lastStage=stage;
 stepLabel.textContent=running?({checkin:'Step 1 of 4 · Check in',prepare:'Step 2 of 4 · Review your run',execute:'Step 3 of 4 · Run and record',review:'Step 4 of 4 · Review and learn'}[stage]):checked?'Check-in saved · You’re set for today':'Today · Check in';
@@ -152,6 +153,25 @@ if(running&&!w.execution&&!w.prediction){const already=button('Already ran? Reco
 if(dailyOpen&&w&&stage!=='checkin')await openDaily(w,stage);
 if(!running&&checked){homeAction.textContent='Edit today’s check-in';checkFold.open=false;}
 homeAction.disabled=false;
+}
+function renderSessionChange(w,workouts,today){
+$('sessionChangeBox')?.remove();
+if(!w||w.state!=='planned'||w.execution||w.prediction)return;
+const box=make('details',null,$('coachToday').parentElement);box.id='sessionChangeBox';make('summary','Change today’s session',box);
+make('p','Preview the effect on your week before saving. Your original plan remains in history.',box,'hint');
+const form=make('form',null,box),grid=make('div',null,form,'grid');
+const field=(id,label,type)=>{const f=make('div',null,grid,'field');const l=make('label',label,f);l.htmlFor=id;const input=make(type==='select'?'select':'input',null,f);input.id=id;if(type!=='select')input.type=type;return input};
+const action=field('sessionChangeAction','Change','select');for(const [v,label] of [['swap','Swap with another day'],['distance','Change distance'],['skip','Skip this session']]){const o=make('option',label,action);o.value=v;}
+const reason=field('sessionChangeReason','Why?','select');for(const [v,label] of [['availability','Time / availability'],['fatigue','Tired / need recovery'],['feeling_good','Feeling good'],['other','Other']]){const o=make('option',label,reason);o.value=v;}
+const swap=field('sessionSwapDate','Swap with','select');make('option','Choose a day',swap).value='';for(const other of workouts.filter(r=>r.date>today&&r.state==='planned'&&!r.prediction&&!r.execution&&r.current.kind!=='race')){const o=make('option',`${other.date} · ${other.current.distance_km} km · ${other.current.purpose}`,swap);o.value=other.date;}
+const distance=field('sessionNewDistance','New distance (km)','number');distance.min='0.1';distance.max='100';distance.step='0.1';distance.value=w.current.distance_km||'';
+const note=field('sessionChangeNote','Note (optional)','text');note.maxLength=300;
+const preview=make('button','Preview change',form,'secondary');preview.type='submit';
+const result=make('div',null,form);result.id='sessionChangePreview';result.setAttribute('role','status');
+let proposal=null;
+const confirm=button('Save this change',form,async()=>{if(!proposal)return;confirm.disabled=true;try{await api(`/app/api/coach/workouts/${w.id}/change`,'POST',proposal);dailyOpen=false;$('coachDetail').hidden=true;checkFold.open=false;await home();}catch(e){result.textContent=e.message;proposal=null;confirm.hidden=true;}finally{confirm.disabled=false;}},'primary');confirm.id='sessionChangeConfirm';confirm.hidden=true;
+const invalidate=()=>{proposal=null;confirm.hidden=true;result.replaceChildren();swap.closest('.field').hidden=action.value!=='swap';swap.required=action.value==='swap';distance.closest('.field').hidden=action.value!=='distance';distance.required=action.value==='distance';distance.disabled=action.value!=='distance';};form.addEventListener('input',invalidate);invalidate();
+form.onsubmit=async e=>{e.preventDefault();preview.disabled=true;try{const request={action:action.value,reason:reason.value,note:note.value,swap_date:action.value==='swap'?swap.value:null,distance_km:action.value==='distance'?Number(distance.value):null};const data=await api(`/app/api/coach/workouts/${w.id}/change`,'POST',request);result.replaceChildren();for(const c of data.changes)make('p',`${c.date}: ${c.before_km} km → ${c.after_km} km · ${c.purpose}`,result);for(const week of data.weeks)make('p',`Week of ${week.week}: ${week.before_km} km → ${week.after_km} km`,result);for(const warning of data.warnings)make('p',warning,result);proposal={...request,confirm_token:data.confirm_token};confirm.hidden=false;}catch(e){result.textContent=e.message;}finally{preview.disabled=false;}};
 }
 async function openDaily(w,stage){
 try{dailyError.textContent='';dailyHost.append($('coachDetail'));dailyHost.hidden=false;await window.strideOpenWorkout(w,stage==='checkin'?'prepare':stage);$('coachTodayOpen').hidden=true;

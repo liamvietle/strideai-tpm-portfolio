@@ -13,6 +13,7 @@ from app.athlete_learning import health_points, learn
 from app.athlete_models import Decision, Execution, GeneratePlan
 from app.athlete_planning import generate, plan_setup
 from app.race_prediction import race_prediction
+from app.session_changes import SessionChange, edit_session
 from app.storage import connect
 from app.training_plan import get_goal
 
@@ -93,6 +94,11 @@ def workouts(athlete_id: str = "viet"):
             r["prediction"].pop("context", None)
         result.append(r)
     return result
+
+
+@router.post("/workouts/{wid}/change")
+def change_session(wid: int, payload: SessionChange, athlete_id: str = "viet"):
+    return edit_session(wid, payload, athlete_id)
 
 
 @router.post("/workouts/{wid}/predict")
