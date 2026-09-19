@@ -129,7 +129,7 @@ def runs(athlete):
 def observations(athlete):
     with connect() as c:
         rows = c.execute(
-            """SELECT w.date,w.original_json,p.prediction_json,d.choice,
+            """SELECT w.date,w.original_json,w.current_json,p.prediction_json,d.choice,
             x.execution_json,e.evaluation_json FROM coach_workouts w
             JOIN coach_evaluations e ON e.workout_id=w.id
             JOIN coach_executions x ON x.workout_id=w.id
@@ -152,7 +152,7 @@ def observations(athlete):
         planned = (
             (pred.get("planned") or json.loads(r["original_json"]))
             if pred
-            else json.loads(r["original_json"])
+            else json.loads(r["current_json"])
         )
         performed = pred["recommended"] if pred and r["choice"] == "accept" else planned
         result.append(
