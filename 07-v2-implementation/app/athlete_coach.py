@@ -467,6 +467,14 @@ def execute(wid, payload, athlete):
                 x["prediction_valid"] = True
     else:
         x.update(source="manual", prediction_valid=bool(pred))
+    # Freeze the executed prescription, independent of later plan changes.
+    with connect() as c:
+        decision = c.execute("SELECT choice FROM coach_decisions WHERE workout_id=?", (wid,)).fetchone()
+    prediction = json.loads(pred["prediction_json"]) if pred else None
+    x["target_snapshot"] = (
+        prediction["recommended" if decision and decision[0] == "accept" else "planned"]
+        if prediction and x.get("prediction_valid") else json.loads(row["current_json"])
+    )
     if x["distance_km"] > 0 and x["duration_seconds"] <= 0:
         raise HTTPException(422, "A run requires a positive duration.")
     if x["splits"]:

@@ -26,3 +26,20 @@ Sync remains app-driven (including a throttled refresh on returning to the app),
 not a new background webhook service. No schema migrations or environment changes.
 
 Validation: 130 pytest tests; tests/strava_results_browser.cjs at mobile width.
+
+## Expected values and perceived effort
+
+Strava Perceived Exertion uses 1–10, mapped directly to RPE. Pending linked-workout
+candidates receive a bounded best-effort activity-detail lookup (maximum five per
+sync, five-second timeout each). Missing fields, errors or invalid values leave
+RPE unknown; Relative Effort/suffer_score is not converted.
+
+Workout responses now include comparison_metrics for both new and legacy results.
+Valid pre-run predictions take priority per metric; saved plan targets supply the
+fallback. New executions freeze their target snapshot. Legacy results without a
+valid prediction use original saved plan targets, not reconstructed forecasts.
+Distance and duration are included. Differences against ranges use their midpoint.
+These display comparisons do not alter prediction_valid, evaluation history or
+learning eligibility. Imported plans without pace/HR/RPE retain missing values.
+
+Validation after this addition: 134 pytest tests and mobile browser review passed.

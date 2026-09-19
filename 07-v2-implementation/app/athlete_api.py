@@ -92,6 +92,9 @@ def workouts(athlete_id: str = "viet"):
         if r["prediction"]:
             # UI needs evidence summary, not a duplicated longitudinal payload.
             r["prediction"].pop("context", None)
+        if r["execution"]:
+            from app.workout_comparison import comparison_metrics
+            r["comparison_metrics"] = comparison_metrics(r)
         result.append(r)
     return result
 

@@ -62,3 +62,22 @@ def test_explicit_effort_imported_only_when_valid(workout):
     assert workouts()[0]['execution']['rpe']==4
     with pytest.raises(HTTPException):
         execution_feedback(workout['id'],ExecutionFeedback(rpe=2),'someone-else')
+
+
+def test_effort_detail_lookup_and_failure_do_not_lose_metrics(workout, monkeypatch):
+    from app.strava_integration import _enrich_pending_effort
+    import httpx
+    run()
+    class Response:
+        def raise_for_status(self): pass
+        def json(self): return {'id':1,'perceived_exertion':7}
+    monkeypatch.setattr('app.strava_integration.httpx.get',lambda *a,**kw:Response())
+    _enrich_pending_effort('viet',{})
+    assert store.runs('viet')[0]['rpe']==7
+    run()  # Summary refresh has no effort.
+    def fail(*a,**kw): raise httpx.ReadTimeout('timeout')
+    monkeypatch.setattr('app.strava_integration.httpx.get',fail)
+    _enrich_pending_effort('viet',{})
+    reconcile('viet')
+    assert workouts()[0]['execution']['distance_km']==5
+    assert workouts()[0]['execution']['rpe'] is None
