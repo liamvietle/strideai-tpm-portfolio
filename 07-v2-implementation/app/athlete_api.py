@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from app import athlete_store as store
 from app.athlete_coach import decide, evaluate, execute, predict
 from app.athlete_learning import health_points, learn
-from app.athlete_models import Decision, Execution, ExecutionFeedback, GeneratePlan
+from app.athlete_models import Decision, Execution, ExecutionFeedback, GeneratePlan, PredictionConditions
 from app.athlete_planning import generate, plan_setup
 from app.race_prediction import race_prediction
 from app.session_changes import SessionChange, edit_session
@@ -112,8 +112,8 @@ def change_session(wid: int, payload: SessionChange, athlete_id: str = "viet"):
 
 
 @router.post("/workouts/{wid}/predict")
-def predict_workout(wid: int, athlete_id: str = "viet"):
-    return predict(wid, athlete_id)
+def predict_workout(wid: int, payload: PredictionConditions | None = None, athlete_id: str = "viet"):
+    return predict(wid, athlete_id, payload.elevation_gain_m if payload else None)
 
 
 @router.post("/workouts/{wid}/decision")

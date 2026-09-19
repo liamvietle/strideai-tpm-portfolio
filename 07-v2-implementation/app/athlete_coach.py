@@ -114,7 +114,7 @@ def week_effect(c, row, recommended):
     return effect
 
 
-def predict(wid, athlete):
+def predict(wid, athlete, elevation_gain_m=None):
     p = store.profile(athlete)
     goal = get_goal(athlete)
     with connect() as c:
@@ -280,7 +280,11 @@ def predict(wid, athlete):
     def expectation(target):
         from app.historical_expectation import estimate
         result = estimate(target, row["date"], store.runs(athlete), obs,
-                          p.max_hr, check.get("planned_intensity"))
+                          p.max_hr, check.get("planned_intensity"),
+                          conditions={"feels_like_c": (weather.get('values') or {}).get('feels_like_c') if weather and weather.get('status') == 'available' else None,
+                                      "elevation_gain_m": elevation_gain_m * target["distance_km"] / w["distance_km"] if elevation_gain_m is not None else None,
+                                      "weather_source": weather.get('source') if weather else None,
+                                      "weather_start": weather.get('start') if weather else None})
         if fatigue.score > 2:
             result["limitations"].append("Today’s recovery signals reduce confidence; review the recommended workout targets.")
         return result

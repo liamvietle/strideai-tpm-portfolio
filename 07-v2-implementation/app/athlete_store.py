@@ -91,7 +91,7 @@ def workout(c, wid, athlete):
 def runs(athlete):
     with connect() as c:
         rows = c.execute(
-            "SELECT * FROM activities WHERE athlete_id=? AND lower(activity_type) IN ('run','running','trailrun','virtualrun') ORDER BY start_time",
+            "SELECT a.*,aw.weather_json FROM activities a LEFT JOIN activity_weather aw ON aw.activity_id=a.id AND aw.status='available' WHERE a.athlete_id=? AND lower(a.activity_type) IN ('run','running','trailrun','virtualrun') ORDER BY a.start_time",
             (athlete,),
         ).fetchall()
     result = []
@@ -121,6 +121,12 @@ def runs(athlete):
             if r.get("duration_seconds") and r.get("distance_km")
             else None
         )
+        from app.activity_weather import number
+        r['elevation_gain_m'] = number(raw.get('total_elevation_gain'))
+        try:
+            r['weather'] = json.loads(r.pop('weather_json') or '{}')
+        except (ValueError, TypeError):
+            r['weather'] = {}
         r["session_kind"] = "race" if r.get("source") == "strava" and raw.get("workout_type") == 1 else None
         effort = raw.get("perceived_exertion") if r.get("source") == "strava" else None
         # Opportunistic only: Strava does not document this as a stable API field.

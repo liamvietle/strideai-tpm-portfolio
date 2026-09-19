@@ -26,3 +26,26 @@ the recommended workout and uncertainty rather than an invented numerical HR shi
 Prediction evidence exposes per-metric coverage and limitations. Reopening a locked
 prediction never recomputes it from later results. Tests: 143 passed; mobile review
 flow passed. Existing reductions are not undone by this display/prediction change.
+
+## Weather and terrain conditioning
+
+Historical weather from activity_weather and Strava total ascent now support
+condition-matched estimates. The pre-run forecast saved with the daily check-in
+supplies apparent temperature; an optional route-details field supplies expected
+ascent (zero means flat; blank means unknown). Shortened recommendation candidates
+assume proportional ascent, preserving the entered ascent per kilometre.
+
+For the existing comparable pool, match apparent temperature within 3°C and ascent
+per kilometre within max(3 metres/km, 30% of expected ascent density). When both
+conditions are supplied, require both. Each metric needs three matching observations
+to replace its baseline. Preserve baseline, delta, matching IDs, coverage and input
+conditions in the locked prediction. No forecast or missing altitude is not treated
+as cool or flat. Insufficient coverage preserves baseline explicitly. HR and RPE
+are not assigned invented universal heat/hill multipliers. Existing weather safety
+rules still restrict candidates before prediction.
+
+These descriptive matches supersede the earlier lack of condition adjustment;
+they do not isolate causal heat versus hill effects, model grade profiles, technical
+surface, net descent or wind direction. Thresholds are product matching heuristics.
+Validation: full 143-test suite passed, plus two added condition-matching tests;
+mobile review flow passed. No additional provider credentials or schema changes.

@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from statistics import median, mean
 
 
-def estimate(target, day, runs, observations, max_hr=None, intensity=None):
+def estimate(target, day, runs, observations, max_hr=None, intensity=None, conditions=None):
     kind = intensity if target['kind'] == 'custom' else target['kind']
     cutoff = (date.fromisoformat(day) - timedelta(days=180)).isoformat()
     evaluated = {o['execution'].get('activity_id'): o for o in observations if o['execution'].get('activity_id')}
@@ -33,7 +33,7 @@ def estimate(target, day, runs, observations, max_hr=None, intensity=None):
                 continue
             if max_hr and run.get('average_hr') and run['average_hr'] > .85 * max_hr:
                 continue
-        pool.append({**run, 'rpe': rpe})
+        pool.append({**run, 'rpe': rpe, 'session_kind': known_kind})
     pool = sorted(pool, key=lambda r:r['date'])[-20:]
     pace_target = mean(target['pace_target']) if target.get('pace_target') else None
     if pace_target:
@@ -46,7 +46,7 @@ def estimate(target, day, runs, observations, max_hr=None, intensity=None):
               'rpe':[r['rpe'] for r in similar if r.get('rpe') is not None]}
     result = {'samples':len(pool), 'basis':'Historical runs matched by distance, intensity evidence and pace',
               'metric_samples':{}, 'metric_basis':{}, 'ranges':{}, 'activity_ids':[r['id'] for r in pool],
-              'limitations':['Historical estimates are not yet adjusted for differences in heat, terrain or today’s health.',
+              'limitations':['Conditions matching is descriptive, not a causal or clinically calibrated adjustment. Wind direction, surface and today’s health are not numerically modelled.',
                               'Unlabelled historical runs use HR/effort filters; session type may be uncertain.']}
     for metric, vals in values.items():
         result['metric_samples'][metric] = len(vals)
@@ -61,5 +61,40 @@ def estimate(target, day, runs, observations, max_hr=None, intensity=None):
             allowed = metric=='rpe' or kind not in ('threshold','interval','race')
             result[metric] = mean(limits) if limits and allowed else None
             result['metric_basis'][metric] = 'Provisional plan target' if result[metric] is not None else 'Insufficient history'
+    result['conditions'] = conditions or {}
+    result['condition_adjustments'] = {}
+    if conditions:
+        feels = conditions.get('feels_like_c')
+        gain = conditions.get('elevation_gain_m')
+        matches = pool
+        if feels is not None:
+            matches = [r for r in matches if isinstance(r.get('weather'), dict)
+                       and r['weather'].get('feels_like_c') is not None
+                       and abs(r['weather']['feels_like_c']-feels) <= 3]
+        if gain is not None and target['distance_km'] > 0:
+            density = gain / target['distance_km']
+            matches = [r for r in matches if r.get('elevation_gain_m') is not None
+                       and abs(r['elevation_gain_m']/r['distance_km']-density) <= max(3, density*.3)]
+        if feels is not None or gain is not None:
+            adjusted = estimate(target, day, matches, [], max_hr, intensity)
+            for metric in ('pace','hr','rpe'):
+                count = adjusted['metric_samples'][metric]
+                applied = count >= 3 and adjusted[metric] is not None
+                result['condition_adjustments'][metric] = dict(
+                    applied=applied, samples=count, baseline=result[metric],
+                    delta=round(adjusted[metric]-result[metric],1) if applied and result[metric] is not None else None,
+                    activity_ids=adjusted['activity_ids'],
+                    reason='Similar weather/terrain observations' if applied else 'Too few matching observations; baseline retained')
+                if applied:
+                    result[metric] = adjusted[metric]
+                    result['ranges'][metric] = adjusted['ranges'][metric]
+                    result['metric_samples'][metric] = count
+                    result['metric_basis'][metric] = 'Historical observations in similar conditions'
+        if feels is None:
+            result['limitations'].append('No run-time forecast supplied: weather matching unavailable.')
+        if gain is None:
+            result['limitations'].append('Route ascent unknown: terrain matching unavailable.')
+    else:
+        result['limitations'].append('No expected weather or route ascent supplied; baseline retained.')
     result['quality'] = 'uncertain'
     return result
