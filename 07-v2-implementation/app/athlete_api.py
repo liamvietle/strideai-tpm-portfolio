@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from app import athlete_store as store
 from app.athlete_coach import decide, evaluate, execute, predict
 from app.athlete_learning import health_points, learn
-from app.athlete_models import Decision, Execution, ExecutionFeedback, GeneratePlan
+from app.athlete_models import Decision, Execution, ExecutionFeedback, GeneratePlan, PredictionConditions
 from app.athlete_planning import generate, plan_setup
 from app.race_prediction import race_prediction
 from app.session_changes import SessionChange, edit_session
@@ -75,7 +75,7 @@ def workouts(athlete_id: str = "viet"):
     store.init_athlete_db()
     with connect() as c:
         rows = c.execute(
-            """SELECT w.*,p.prediction_json,d.choice,x.execution_json,e.evaluation_json
+            """SELECT w.*,p.prediction_json,d.choice,x.execution_json,x.created_at AS execution_created_at,e.evaluation_json
             FROM coach_workouts w LEFT JOIN coach_predictions p ON p.workout_id=w.id
             LEFT JOIN coach_decisions d ON d.workout_id=w.id
             LEFT JOIN coach_executions x ON x.workout_id=w.id
@@ -94,6 +94,13 @@ def workouts(athlete_id: str = "viet"):
             r["prediction"].pop("context", None)
         if r["execution"]:
             from app.workout_comparison import comparison_metrics
+            if not r["execution"].get("target_snapshot"):
+                with connect() as c:
+                    historical = c.execute("""SELECT after_json FROM coach_plan_changes
+                        WHERE athlete_id=? AND workout_id=? AND julianday(created_at)<=julianday(?)
+                        ORDER BY julianday(created_at) DESC,id DESC LIMIT 1""",
+                        (athlete_id,r['id'],r['execution_created_at'])).fetchone()
+                r['execution_target'] = json.loads(historical[0]) if historical else r['original']
             r["comparison_metrics"] = comparison_metrics(r)
         result.append(r)
     return result
@@ -105,8 +112,8 @@ def change_session(wid: int, payload: SessionChange, athlete_id: str = "viet"):
 
 
 @router.post("/workouts/{wid}/predict")
-def predict_workout(wid: int, athlete_id: str = "viet"):
-    return predict(wid, athlete_id)
+def predict_workout(wid: int, payload: PredictionConditions | None = None, athlete_id: str = "viet"):
+    return predict(wid, athlete_id, payload.elevation_gain_m if payload else None)
 
 
 @router.post("/workouts/{wid}/decision")

@@ -10,7 +10,7 @@ def comparison_metrics(workout):
     forecast = prediction.get('recommended_expectation' if accepted else 'planned_expectation', {}) if valid else {}
     target = execution.get('target_snapshot') or (
         prediction.get('recommended' if accepted else 'planned') if valid else None
-    ) or workout['original']
+    ) or workout.get('execution_target') or workout['original']
     result = []
     for metric, actual, target_key in (
         ('Distance', execution.get('distance_km'), 'distance_km'),

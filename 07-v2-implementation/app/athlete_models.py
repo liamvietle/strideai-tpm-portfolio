@@ -122,3 +122,7 @@ class ExecutionFeedback(StrictModel):
     rpe: float | None = Field(None, ge=0, le=10)
     pain: bool | None = None
     completed: bool | None = None
+
+
+class PredictionConditions(StrictModel):
+    elevation_gain_m: float | None = Field(None, ge=0, le=10000)
