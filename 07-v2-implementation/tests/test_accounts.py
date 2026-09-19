@@ -6,6 +6,15 @@ from app.storage import connect
 
 PASSWORD='example-long-password'
 
+
+def test_garmin_recovery_account_scope_and_csrf(clients):
+    owner, other = clients
+    body = {'format':'strideai-garmin-recovery-v1', 'days':[{'date':'2026-09-16','sleep_hours':7}]}
+    assert owner.post('/app/api/garmin-recovery/import', json=body, headers={'X-CSRF-Token':''}).status_code == 403
+    assert other.post('/app/api/garmin-recovery/import?athlete_id=viet', json=body).status_code == 200
+    assert owner.get('/app/api/garmin-recovery/history').json()['days'] == 0
+    assert other.get('/app/api/garmin-recovery/history?athlete_id=viet').json()['days'] == 1
+
 @pytest.fixture
 def clients(tmp_path, monkeypatch):
     monkeypatch.setenv('STRIDEAI_DB_PATH',str(tmp_path/'account.db'))

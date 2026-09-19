@@ -11,6 +11,8 @@ from app.accumulated_fatigue import evaluate_workout_v21
 from app.activity_weather import enrich_weather, recent_activities
 from app.dashboard import DASHBOARD_HTML
 from app import accounts
+from app.garmin_recovery import router as garmin_recovery_router
+from app.garmin_recovery_ui import enhance_garmin_recovery_ui
 from app.account_ui import LOGIN_HTML, with_account_ui
 from app.journey import router as journey_router
 from app.journey_ui import enhance_journey_ui
@@ -82,6 +84,7 @@ app = FastAPI(
 
 app.include_router(athlete_router)
 app.include_router(accounts.router)
+app.include_router(garmin_recovery_router)
 
 APP_KEY = os.getenv("STRIDEAI_APP_KEY", "").strip()
 PUBLIC_PATHS = {"/", "/app", "/privacy", "/health", "/app/api/strava/callback"}
@@ -129,6 +132,7 @@ def health() -> dict[str, str]:
 def personal_app(request: Request = None) -> str:
     html = enhance_journey_ui(enhance_athlete_ui(enhance_plan_ui(enhance_personal_app(PERSONAL_APP_HTML))))
 
+    html = enhance_garmin_recovery_ui(html)
     return with_account_ui(html, request.state.account) if accounts.enabled() and request else html
 
 

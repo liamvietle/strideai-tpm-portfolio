@@ -23,7 +23,7 @@ from app.recovery_storage import upsert_recovery_day
 from app.retrieval import load_history, retrieve_similar_history
 from app.storage import connect, save_recommendation
 from app.run_weather import forecast_guidance
-from app.apple_health import enrich_with_apple_health, health_rows
+from app.recovery_sources import enrich_with_recovery, automatic_recovery_rows
 
 
 def _day_index(checkin_date: str) -> int:
@@ -60,7 +60,7 @@ def _snapshot_from_row(row: dict) -> RecoverySnapshot:
 
 
 def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWorkoutInput, float | None]:
-    payload = enrich_with_apple_health(payload)
+    payload = enrich_with_recovery(payload)
     from app.training_plan import get_goal
     goal = get_goal(payload.athlete_id)
     if goal:
@@ -69,11 +69,14 @@ def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWork
     calculated_load = calculate_recent_load_ratio(payload.athlete_id, payload.checkin_date)
     effective_load = payload.recent_load_ratio if payload.recent_load_ratio is not None else calculated_load
     start = (date.fromisoformat(payload.checkin_date) - timedelta(days=7)).isoformat()
-    automatic_rows = health_rows(payload.athlete_id, start, payload.checkin_date)
+    automatic_rows = automatic_recovery_rows(payload.athlete_id, start, payload.checkin_date)
     manual_rows = prior_checkins(payload.athlete_id, payload.checkin_date, days=7)
     merged = {row["checkin_date"]: row for row in automatic_rows}
     for row in manual_rows:
-        base = merged.get(row["checkin_date"], {})
+        base = dict(merged.get(row["checkin_date"], {}))
+        if row.get("hrv_ms") is not None:
+            base["hrv_baseline_low"] = row.get("hrv_baseline_low")
+            base["hrv_baseline_high"] = row.get("hrv_baseline_high")
         merged[row["checkin_date"]] = {
             **base,
             **{key: value for key, value in row.items() if value is not None},
@@ -107,7 +110,7 @@ def build_accumulated_input(payload: DailyCheckInInput) -> tuple[AccumulatedWork
 
 
 def create_personal_recommendation(payload: DailyCheckInInput) -> PersonalRecommendationResponse:
-    payload = enrich_with_apple_health(payload)
+    payload = enrich_with_recovery(payload)
     if payload.planned_activity_type != PlannedActivityType.run:
         calculated_load = calculate_recent_load_ratio(payload.athlete_id, payload.checkin_date)
         try:

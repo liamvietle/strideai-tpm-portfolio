@@ -15,13 +15,14 @@ footer{border-top:1px solid #dce6e8;margin-top:32px;padding-top:20px}@media(max-
 </style></head><body><main>
 <a class="brand" href="/app">StrideAI</a>
 <h1>Privacy policy</h1>
-<p class="meta">Effective date: 18 September 2026</p>
+<p class="meta">Effective date: 19 September 2026</p>
 <p class="intro">StrideAI is an early-stage personal running-coach application operated by Viet Le in Vietnam. This notice explains how information is handled when you use StrideAI at stride-ai.app.</p>
 <h2>Information we handle</h2>
 <ul>
 <li><strong>Training and recovery inputs:</strong> athlete identifier, race goals, training plans, workout dates, distance and intensity, sleep, heart-rate variability, resting heart rate, soreness, pain indicators, fatigue, training decisions, and outcome notes you provide.</li>
 <li><strong>Connected activities:</strong> after you authorize Strava, we receive your Strava athlete identifier and name, authorization tokens and permissions, and activity summaries. These can include activity names and types, dates, distance, duration, heart rate, elevation, cadence, and location or route information included in the source summary. Private activities are included if you grant that permission. Activity summaries are stored for training-history and recovery features.</li>
 <li><strong>Uploaded activities:</strong> information parsed from Garmin CSV or TCX files you choose to upload. Direct Garmin Connect API access is not currently enabled.</li>
+<li><strong>Imported Garmin recovery summaries:</strong> sleep duration, resting heart rate, HRV values and their Garmin baseline limits, with their original dates. We store only these selected recovery fields from prepared export files, separately from activity history. Direct Garmin API access is not enabled.</li>
 <li><strong>Apple Health recovery summaries:</strong> after you grant read permission in the StrideAI iPhone companion, the companion reads sleep analysis, resting heart rate and heart-rate variability (SDNN). It combines those samples on your phone and sends daily summary values, sample counts, dates, time zone and source names to StrideAI. StrideAI does not request permission to write to Apple Health and does not upload raw HealthKit samples.</li>
 <li><strong>Generated information:</strong> load calculations, recovery assessments, recommendations, explanations, weather context, outcome comparisons, and diagnostic records.</li>
 <li><strong>Technical and contact information:</strong> your browser sends ordinary request information, including IP address and browser details, to the hosting service. If you contact us, we receive your email address and message.</li>
