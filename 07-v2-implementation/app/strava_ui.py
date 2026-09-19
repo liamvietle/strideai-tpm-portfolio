@@ -114,6 +114,7 @@ STRAVA_SCRIPT = r'''
     const status=byId('stravaSyncStatus');if(status)status.textContent='Strava connected. Initial activity sync is running automatically.';
     history.replaceState({},'',window.location.pathname);
   }
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadStravaStatus({auto:true})});
   loadStravaStatus({auto:true});
 })();
 </script>

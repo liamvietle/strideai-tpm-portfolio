@@ -265,6 +265,9 @@ def sync_strava_activities(athlete_id: str = "viet", *, max_pages: int = 2) -> d
             break
 
     inserted, updated = upsert_activities(records)
+    _enrich_pending_effort(athlete_id, headers)
+    from app.strava_results import reconcile
+    matching = reconcile(athlete_id)
     synced_at = datetime.now(timezone.utc).isoformat()
     with connect() as conn:
         conn.execute(
@@ -273,6 +276,7 @@ def sync_strava_activities(athlete_id: str = "viet", *, max_pages: int = 2) -> d
         )
 
     return {
+        **matching,
         "fetched": fetched,
         "activities": len(records),
         "running_activities": running,
@@ -286,3 +290,34 @@ def disconnect_strava(athlete_id: str = "viet") -> None:
     init_strava_db()
     with connect() as conn:
         conn.execute("DELETE FROM strava_connections WHERE athlete_id=?", (athlete_id,))
+
+
+def _enrich_pending_effort(athlete_id, headers):
+    """Best-effort detail lookup for at most five runs awaiting workout linkage."""
+    from app import athlete_store as store
+    store.init_athlete_db()
+    with connect() as conn:
+        pending = {r[0] for r in conn.execute("""SELECT w.date FROM coach_workouts w
+            LEFT JOIN coach_executions x ON x.workout_id=w.id
+            WHERE w.athlete_id=? AND w.active=1 AND x.workout_id IS NULL""", (athlete_id,))}
+    candidates = [r for r in store.runs(athlete_id)
+                  if r['source'] == 'strava' and r['date'] in pending and r.get('rpe') is None]
+    for run in candidates[-5:]:
+        try:
+            response = httpx.get(f"{STRAVA_ACTIVITIES_URL}/{run['source_activity_id']}",
+                                 headers=headers, timeout=5.0)
+            response.raise_for_status()
+            detail = response.json()
+            if isinstance(detail, dict) and str(detail.get('id')) == run['source_activity_id']:
+                # Preserve summary metrics; only enrich the raw payload for effort.
+                with connect() as conn:
+                    row = conn.execute("SELECT raw_payload FROM activities WHERE id=? AND athlete_id=?",
+                                       (run['id'], athlete_id)).fetchone()
+                    raw = json.loads(row[0] or '{}')
+                    if 'perceived_exertion' in detail:
+                        raw['perceived_exertion'] = detail['perceived_exertion']
+                        conn.execute("UPDATE activities SET raw_payload=? WHERE id=? AND athlete_id=?",
+                                     (json.dumps(raw), run['id'], athlete_id))
+        except (httpx.HTTPError, ValueError, TypeError):
+            # Effort is optional; provider errors must not block recorded metrics.
+            continue

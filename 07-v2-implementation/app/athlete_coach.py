@@ -451,6 +451,7 @@ def execute(wid, payload, athlete):
             duration_seconds=activity["duration_seconds"],
             average_hr=activity["average_hr"],
             source="synced_activity",
+            rpe=payload.rpe if payload.rpe is not None else activity.get("rpe"),
         )
         if x["distance_km"] is None or x["duration_seconds"] is None:
             raise HTTPException(422, "Activity lacks distance or duration.")
@@ -466,6 +467,14 @@ def execute(wid, payload, athlete):
                 x["prediction_valid"] = True
     else:
         x.update(source="manual", prediction_valid=bool(pred))
+    # Freeze the executed prescription, independent of later plan changes.
+    with connect() as c:
+        decision = c.execute("SELECT choice FROM coach_decisions WHERE workout_id=?", (wid,)).fetchone()
+    prediction = json.loads(pred["prediction_json"]) if pred else None
+    x["target_snapshot"] = (
+        prediction["recommended" if decision and decision[0] == "accept" else "planned"]
+        if prediction and x.get("prediction_valid") else json.loads(row["current_json"])
+    )
     if x["distance_km"] > 0 and x["duration_seconds"] <= 0:
         raise HTTPException(422, "A run requires a positive duration.")
     if x["splits"]:
@@ -576,14 +585,10 @@ def evaluate(wid, athlete):
                     return sum(s["distance_km"] for s in group) / duration / hr
 
                 drift = round((1 - efficiency(b) / efficiency(a)) * 100, 2)
-        abnormal = (
-            x["pain"]
-            or not x["completed"]
-            or completion < 0.9
-            or (hr_error is not None and hr_error > 8)
-            or (rpe_error is not None and rpe_error > 1.5)
-            or (drift is not None and drift > 7)
-        )
+        from app.post_run_policy import recovery_response
+        recovery = recovery_response(x, completion, hr_error, rpe_error, drift)
+        short = not x["completed"] or completion < .9
+        abnormal = x["pain"] or bool(recovery["evidence"])
         enough = (
             expected
             and pace_error is not None
@@ -601,12 +606,13 @@ def evaluate(wid, athlete):
             else (
                 "insufficient_data"
                 if not enough
-                else ("within" if pace_matched else "different_execution")
+                else ("within" if pace_matched and not short else "different_execution")
             )
         )
         if (
             enough
             and not abnormal
+            and not short
             and rpe_error <= -1
             and hr_error <= 0
             and abs(pace_error) <= expected["pace"] * 0.05
@@ -618,7 +624,7 @@ def evaluate(wid, athlete):
             else (
                 "incomplete_or_strained"
                 if abnormal
-                else ("completed" if x["completed"] else "unknown")
+                else ("shortened" if short else "completed")
             )
         )
         result = {
@@ -659,6 +665,7 @@ def evaluate(wid, athlete):
                 "Faster alone is not better. Terrain and weather can confound comparisons.",
             ],
             "next_changes": [],
+            "recovery_response": recovery,
         }
         # Atomic, monotonic recovery adjustment: never increase or cram future volume.
         if x["pain"]:
@@ -672,11 +679,11 @@ def evaluate(wid, athlete):
                 "INSERT INTO athlete_profiles VALUES(?,?,?) ON CONFLICT(athlete_id) DO UPDATE SET profile_json=excluded.profile_json,updated_at=excluded.updated_at",
                 (athlete, json.dumps(profile_data), store.now()),
             )
-        if abnormal:
-            end = (date.fromisoformat(row["date"]) + timedelta(days=7)).isoformat()
+        if recovery["action"] in {"pause", "ease_next"}:
+            end = (date.fromisoformat(row["date"]) + timedelta(days=7 if x["pain"] else 3)).isoformat()
             future = list(
                 c.execute(
-                    "SELECT * FROM coach_workouts WHERE athlete_id=? AND active=1 AND date>? AND date<=? AND state='planned'",
+                    "SELECT * FROM coach_workouts WHERE athlete_id=? AND active=1 AND date>? AND date<=? AND state='planned' ORDER BY date",
                     (athlete, row["date"], end),
                 )
             )
@@ -684,11 +691,13 @@ def evaluate(wid, athlete):
                 future_w = json.loads(r["current_json"])
                 if future_w["kind"] == "rest" and not (x["pain"] and future_w.get("strength_session")):
                     continue
-                revised = cut(future_w, 0 if x["pain"] else 0.85, easy=True)
+                if not x["pain"] and future_w.get("distance_km", 0) <= 0:
+                    continue
+                revised = cut(future_w, 0 if x["pain"] else 0.9, easy=True)
                 reason = (
                     "Pain after running: pause and reassess before resuming."
                     if x["pain"]
-                    else "Incomplete or strained session: ease the next seven days; do not make up missed mileage."
+                    else recovery["explanation"] + " " + " ".join(recovery["evidence"])
                 )
                 change(c, r, revised, reason, wid)
                 result["next_changes"].append(
@@ -699,6 +708,8 @@ def evaluate(wid, athlete):
                         "reason": reason,
                     }
                 )
+                if not x["pain"]:
+                    break
         if pred:
             legacy = c.execute(
                 "SELECT recommendation_id FROM coach_predictions WHERE workout_id=?",
