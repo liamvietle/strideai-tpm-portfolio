@@ -137,13 +137,13 @@ const running=!!w&&(w.current.distance_km>0||!!w.execution||!!w.prediction);
 renderSessionChange(w,workouts,profile.today);
 const stage=w?.evaluation?'review':w?.execution?'review':!checked?'checkin':!w?.prediction||!w?.choice?'prepare':'execute';
 if(stage==='execute'&&lastStage!==stage){dailyOpen=false;$('coachDetail').hidden=true;}lastStage=stage;
-stepLabel.textContent=running?({checkin:'Step 1 of 4 · Check in',prepare:'Step 2 of 4 · Review your run',execute:'Step 3 of 4 · Run and record',review:'Step 4 of 4 · Review and learn'}[stage]):checked?'Check-in saved · You’re set for today':'Today · Check in';
+stepLabel.textContent=running?({checkin:'Step 1 of 4 · Check in',prepare:'Step 2 of 4 · Review your run',execute:'Step 3 of 4 · Sync and review',review:'Step 4 of 4 · Review and learn'}[stage]):checked?'Check-in saved · You’re set for today':'Today · Check in';
 const fillCheckin=homeAction.onclick;
 const openCheckin=()=>{fillCheckin();sessionDetails.open=!w&&!own||w?.current.kind==='custom'||!running;};
 homeAction.onclick=openCheckin;
 homeAction.hidden=running&&stage!=='checkin';
 $('coachTodayOpen').hidden=!w||(!running&&!w.current.strength_session)||running&&stage==='checkin';
-if(running){$('coachTodayOpen').textContent=stage==='prepare'?'Review today’s run':stage==='execute'?'I’ve finished my run':'Review my result';}
+if(running){$('coachTodayOpen').textContent=stage==='prepare'?'Review today’s run':stage==='execute'?(w.execution?'Review my synced run':'Check my run result'):'Review my result';}
 else $('coachTodayOpen').textContent='View strength session';
 checkFold.hidden=running&&stage!=='checkin';
 if(running&&stage==='checkin')homeAction.onclick=()=>{openCheckin();homeAction.hidden=true;};

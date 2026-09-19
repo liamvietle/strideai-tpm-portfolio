@@ -121,6 +121,9 @@ def runs(athlete):
             if r.get("duration_seconds") and r.get("distance_km")
             else None
         )
+        effort = raw.get("perceived_exertion") if r.get("source") == "strava" else None
+        # Opportunistic only: Strava does not document this as a stable API field.
+        r["rpe"] = effort if type(effort) in (int, float) and 0 <= effort <= 10 else None
         # Raw wearable payloads and locations do not enter the AI evidence package.
         result.append({k: v for k, v in r.items() if k != "raw_payload"})
     return result

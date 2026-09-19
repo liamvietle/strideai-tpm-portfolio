@@ -114,3 +114,9 @@ class Execution(StrictModel):
         if (self.distance_km or 0) > 0 and self.duration_seconds == 0:
             raise ValueError("A run with distance needs a positive duration.")
         return self
+
+
+class ExecutionFeedback(StrictModel):
+    rpe: float | None = Field(None, ge=0, le=10)
+    pain: bool | None = None
+    completed: bool | None = None

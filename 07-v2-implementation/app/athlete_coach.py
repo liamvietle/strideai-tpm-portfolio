@@ -451,6 +451,7 @@ def execute(wid, payload, athlete):
             duration_seconds=activity["duration_seconds"],
             average_hr=activity["average_hr"],
             source="synced_activity",
+            rpe=payload.rpe if payload.rpe is not None else activity.get("rpe"),
         )
         if x["distance_km"] is None or x["duration_seconds"] is None:
             raise HTTPException(422, "Activity lacks distance or duration.")

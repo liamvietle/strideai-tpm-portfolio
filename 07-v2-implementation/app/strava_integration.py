@@ -265,6 +265,8 @@ def sync_strava_activities(athlete_id: str = "viet", *, max_pages: int = 2) -> d
             break
 
     inserted, updated = upsert_activities(records)
+    from app.strava_results import reconcile
+    matching = reconcile(athlete_id)
     synced_at = datetime.now(timezone.utc).isoformat()
     with connect() as conn:
         conn.execute(
@@ -273,6 +275,7 @@ def sync_strava_activities(athlete_id: str = "viet", *, max_pages: int = 2) -> d
         )
 
     return {
+        **matching,
         "fetched": fetched,
         "activities": len(records),
         "running_activities": running,

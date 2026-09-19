@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from app import athlete_store as store
 from app.athlete_coach import decide, evaluate, execute, predict
 from app.athlete_learning import health_points, learn
-from app.athlete_models import Decision, Execution, GeneratePlan
+from app.athlete_models import Decision, Execution, ExecutionFeedback, GeneratePlan
 from app.athlete_planning import generate, plan_setup
 from app.race_prediction import race_prediction
 from app.session_changes import SessionChange, edit_session
@@ -306,3 +306,26 @@ def weekly_review(week: date | None = None, athlete_id: str = "viet"):
         "plan_changes": [{"date": r["date"], "reason": r["reason"]} for r in changes],
         "next_week_reason": "Recovery-driven changes are listed above. Otherwise keep the current progression; missing observations do not justify increasing volume.",
     }
+
+
+@router.post("/sync-results")
+def sync_results(athlete_id: str = "viet"):
+    from app.strava_results import reconcile
+    return reconcile(athlete_id)
+
+
+@router.post("/workouts/{wid}/feedback")
+def execution_feedback(wid: int, payload: ExecutionFeedback, athlete_id: str = "viet"):
+    store.init_athlete_db()
+    with connect() as c:
+        c.execute("BEGIN IMMEDIATE")
+        store.workout(c, wid, athlete_id)
+        if c.execute("SELECT 1 FROM coach_evaluations WHERE workout_id=?", (wid,)).fetchone():
+            raise HTTPException(409, "This result has already been evaluated.")
+        row = c.execute("SELECT execution_json FROM coach_executions WHERE workout_id=?", (wid,)).fetchone()
+        if not row:
+            raise HTTPException(409, "Wait for your run to sync first.")
+        x = json.loads(row[0])
+        x.update({k: v for k, v in payload.model_dump().items() if v is not None})
+        c.execute("UPDATE coach_executions SET execution_json=? WHERE workout_id=?", (json.dumps(x), wid))
+    return {"saved": True}
