@@ -645,3 +645,31 @@ def test_strength_on_non_running_tuesday():
     store.patch_profile({'active_injury': True})
     generate(GeneratePlan(start_mode='today', replace_existing=True), 'viet')
     assert not any(w['current']['strength_session'] for w in workouts())
+
+
+def test_short_run_does_not_reduce_future_plan():
+    w = setup()
+    before = [(r['id'], r['current']) for r in workouts() if r['id'] != w['id']]
+    execute(w['id'], Execution(distance_km=w['current']['distance_km']*.8875,
+        duration_seconds=2400, average_hr=125, rpe=3, completed=False,
+        shortened_reason='availability'), 'viet')
+    result = evaluate(w['id'], 'viet')
+    assert result['quality'] == 'shortened'
+    assert result['next_changes'] == []
+    assert before == [(r['id'], r['current']) for r in workouts() if r['id'] != w['id']]
+
+
+def test_combined_strain_only_changes_next_run():
+    w = setup()
+    check()
+    p = predict(w['id'], 'viet')
+    e = p['planned_expectation']
+    execute(w['id'], Execution(distance_km=w['current']['distance_km'],
+        duration_seconds=w['current']['distance_km']*e['pace'],
+        average_hr=e['hr']+9, rpe=e['rpe']+2, completed=True), 'viet')
+    result = evaluate(w['id'], 'viet')
+    assert result['recovery_response']['action'] == 'ease_next'
+    assert len(result['next_changes']) == 1
+    change = result['next_changes'][0]
+    assert change['after_km'] == round(change['before_km']*.9,2)
+    assert evaluate(w['id'],'viet') == result

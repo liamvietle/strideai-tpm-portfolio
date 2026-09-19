@@ -100,6 +100,7 @@ class Execution(StrictModel):
     rpe: float | None = Field(None, ge=0, le=10)
     pain: bool = False
     completed: bool
+    shortened_reason: Literal["availability", "fatigue", "other", "unspecified"] = "unspecified"
     splits: list[Split] = Field(default_factory=list, max_length=300)
     notes: str = Field("", max_length=2000)
 
@@ -117,6 +118,7 @@ class Execution(StrictModel):
 
 
 class ExecutionFeedback(StrictModel):
+    shortened_reason: Literal["availability", "fatigue", "other", "unspecified"] | None = None
     rpe: float | None = Field(None, ge=0, le=10)
     pain: bool | None = None
     completed: bool | None = None

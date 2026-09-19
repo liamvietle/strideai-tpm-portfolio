@@ -43,3 +43,18 @@ These display comparisons do not alter prediction_valid, evaluation history or
 learning eligibility. Imported plans without pace/HR/RPE retain missing values.
 
 Validation after this addition: 134 pytest tests and mobile browser review passed.
+
+## Post-run adjustment policy
+
+A short/incomplete run alone no longer reduces future training. Optional feedback
+records availability, fatigue or another reason. Completion remains factual and
+is separate from recovery evidence. One signal prompts monitoring only. Combined
+physiological (HR error or drift) and subjective (RPE error or reported fatigue)
+evidence can reduce only the next unlocked run within three days by 10%, with an
+explicit evidence list. Correlated HR and drift signals cannot trigger this alone.
+Pain retains the existing pause and reassessment safeguards. These are product
+heuristics, not clinically validated thresholds. Existing evaluated outcomes and
+previous plan reductions are not silently rewritten.
+
+Tests cover 7.1/8 km due to availability, isolated signals, correlated HR signals,
+combined strain affecting only one workout, idempotent evaluation and pain.
