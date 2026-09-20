@@ -66,11 +66,16 @@ def choose(context, candidates, fallback_id):
             "prompt_version": "athlete-loop-1",
             "latency_ms": round((time.monotonic() - started) * 1000),
         }
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        reason = "Provider unavailable or response failed constraints"
+        if isinstance(exc, httpx.HTTPStatusError):
+            reason = {401: "Provider rejected the API key", 403: "Provider denied access to the model or project", 429: "Provider rate limit or quota exceeded"}.get(exc.response.status_code, "Provider returned an HTTP error")
+        elif isinstance(exc, httpx.TimeoutException):
+            reason = "Provider request timed out"
         return fallback_id, {
             **trace,
             "provider": "openai",
             "model": model,
-            "reason": "Provider unavailable or response failed constraints",
+            "reason": reason,
             "latency_ms": round((time.monotonic() - started) * 1000),
         }
