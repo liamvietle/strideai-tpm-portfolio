@@ -339,3 +339,24 @@ def execution_feedback(wid: int, payload: ExecutionFeedback, athlete_id: str = "
         x.update({k: v for k, v in payload.model_dump().items() if v is not None})
         c.execute("UPDATE coach_executions SET execution_json=? WHERE workout_id=?", (json.dumps(x), wid))
     return {"saved": True}
+
+
+from app.late_checkin import LateCheckin
+
+
+@router.get('/workouts/{wid}/late-checkin')
+def get_late_checkin(wid: int, athlete_id: str = 'viet'):
+    from app.late_checkin import read
+    return read(wid, athlete_id)
+
+
+@router.post('/workouts/{wid}/late-checkin')
+def save_late_checkin(wid: int, payload: LateCheckin, athlete_id: str = 'viet'):
+    from app.late_checkin import save
+    return save(wid, payload, athlete_id)
+
+
+@router.post('/ai-test')
+def test_coach_connection(athlete_id: str = 'viet'):
+    from app.late_checkin import test_connection
+    return test_connection(athlete_id)

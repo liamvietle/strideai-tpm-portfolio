@@ -703,3 +703,45 @@ def test_legacy_comparison_recovers_swapped_target_from_audit():
     rows=workouts()
     distance=next(m for m in rows[0]['comparison_metrics'] if m['metric']=='Distance')
     assert distance['expected']==8 and distance['difference']==-.8
+
+
+def test_late_checkin_preserves_evaluation_and_prediction_history():
+    from app.late_checkin import save, read, LateCheckin
+    w=setup()
+    with pytest.raises(HTTPException):
+        save(w['id'],LateCheckin(feeling='good'),'viet')
+    execute(w['id'],Execution(distance_km=7.2,duration_seconds=3000,completed=True),'viet')
+    before=evaluate(w['id'],'viet')
+    saved=save(w['id'],LateCheckin(feeling='tired',sleep_hours=5,pain_before=True),'viet')
+    assert saved['timing']=='retrospective' and saved['recorded_at']
+    assert read(w['id'],'viet')['checkin']['feeling']=='tired'
+    assert evaluate(w['id'],'viet')==before
+    assert workouts()[0]['prediction'] is None
+    with pytest.raises(HTTPException):
+        read(w['id'],'someone-else')
+    with pytest.raises(HTTPException):
+        predict(w['id'],'viet')
+
+
+def test_ai_connection_uses_real_validation_path_without_workout_mutation(monkeypatch):
+    from app.late_checkin import test_connection
+    import httpx
+    w=setup()
+    monkeypatch.setenv('STRIDEAI_COACH_AI_ENABLED','true')
+    monkeypatch.setenv('OPENAI_API_KEY','test-key')
+    monkeypatch.setenv('STRIDEAI_COACH_MODEL','test-model')
+    def respond(*a,**kw):
+        assert 'Synthetic connectivity test' in kw['json']['input']
+        return httpx.Response(200,request=httpx.Request('POST','https://example.test'),json={'output':[{'type':'message','content':[{'type':'output_text','text':json.dumps({'candidate_id':'test_ok','evidence_ids':['connection_test'],'uncertainty':'Synthetic test only'})}]}]})
+    monkeypatch.setattr('app.coach_reasoning.httpx.post',respond)
+    result=test_connection('viet')
+    assert result['success'] and result['model']=='test-model'
+    assert workouts()[0]['prediction'] is None
+    with pytest.raises(HTTPException) as exc:
+        test_connection('viet')
+    assert exc.value.status_code==429
+    def fail(*a,**kw): raise httpx.ReadTimeout('secret provider detail')
+    monkeypatch.setattr('app.coach_reasoning.httpx.post',fail)
+    failed=test_connection('other-athlete')
+    assert not failed['success']
+    assert 'secret' not in str(failed)
