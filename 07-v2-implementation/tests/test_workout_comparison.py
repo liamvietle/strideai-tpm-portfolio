@@ -39,3 +39,17 @@ def test_late_prediction_and_missing_targets_remain_honest():
     assert m['Pace']['expected'] is None
     assert m['Pace']['difference'] is None
     assert m['Distance']['expected']==5
+
+
+def test_retrospective_only_fills_missing_values_without_becoming_prediction():
+    w=workout()
+    w['original'].update(pace_target=None,hr_target=None)
+    w['historical_review_estimate']=dict(pace=365,hr=138,rpe=6,metric_samples=dict(pace=5,hr=4,rpe=3))
+    m={r['metric']:r for r in comparison_metrics(w)}
+    assert m['Pace']['expected']==365 and m['Pace']['difference']==5
+    assert m['HR']['expected']==138
+    assert m['RPE']['expected']==4  # Explicit plan target preserved.
+    assert m['Pace']['basis']=='Historical estimate (retrospective)'
+    assert w['prediction'] is None
+    w['historical_review_estimate']['metric_samples']['hr']=2
+    assert next(r for r in comparison_metrics(w) if r['metric']=='HR')['expected'] is None

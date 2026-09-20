@@ -84,6 +84,7 @@ def workouts(athlete_id: str = "viet"):
             (athlete_id,),
         ).fetchall()
     result = []
+    history_inputs = None
     for row in rows:
         r = dict(row)
         for key in ("original", "current", "prediction", "execution", "evaluation"):
@@ -101,7 +102,24 @@ def workouts(athlete_id: str = "viet"):
                         ORDER BY julianday(created_at) DESC,id DESC LIMIT 1""",
                         (athlete_id,r['id'],r['execution_created_at'])).fetchone()
                 r['execution_target'] = json.loads(historical[0]) if historical else r['original']
-            r["comparison_metrics"] = comparison_metrics(r)
+            metrics = comparison_metrics(r)
+            if any(m['expected'] is None and m['metric'] in ('Pace','HR','RPE') for m in metrics):
+                from app.historical_expectation import estimate
+                if history_inputs is None:
+                    history_inputs = (store.runs(athlete_id), store.observations(athlete_id), store.profile(athlete_id))
+                target = r['execution'].get('target_snapshot') or r.get('execution_target') or r['original']
+                # Historical context only. Do not use the run's actual pace/HR,
+                # late check-in, or observed weather to build its comparator.
+                intensity = None
+                if target['kind'] == 'custom':
+                    with connect() as c:
+                        check = c.execute("SELECT planned_intensity FROM daily_checkins WHERE athlete_id=? AND checkin_date=?",
+                                          (athlete_id,r['date'])).fetchone()
+                    intensity = check[0] if check else None
+                r['historical_review_estimate'] = estimate(target,r['date'],history_inputs[0],history_inputs[1],history_inputs[2].max_hr,intensity)
+                r['historical_review_estimate']['timing'] = 'retrospective'
+                metrics = comparison_metrics(r)
+            r["comparison_metrics"] = metrics
         result.append(r)
     return result
 

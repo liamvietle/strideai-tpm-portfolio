@@ -745,3 +745,21 @@ def test_ai_connection_uses_real_validation_path_without_workout_mutation(monkey
     failed=test_connection('other-athlete')
     assert not failed['success']
     assert 'secret' not in str(failed)
+
+
+def test_review_estimates_from_prior_runs_without_mutating_evaluation():
+    w=setup()
+    with connect() as c:
+        target=dict(w['current'],distance_km=8,kind='easy',pace_target=None,hr_target=None)
+        c.execute('UPDATE coach_workouts SET current_json=? WHERE id=?',(json.dumps(target),w['id']))
+    upsert_activities([ActivityRecord(source='strava',source_activity_id=f'prior-{i}',athlete_id='viet',
+        start_time=f'2026-09-{i:02d}T00:00:00Z',activity_type='Run',distance_km=8,
+        duration_seconds=2880,average_hr=140,raw_format='strava-api-summary') for i in range(1,5)])
+    execute(w['id'],Execution(distance_km=7.2,duration_seconds=3200,average_hr=130,completed=True),'viet')
+    before=evaluate(w['id'],'viet')
+    result=workouts()[0]
+    metrics={m['metric']:m for m in result['comparison_metrics']}
+    assert metrics['Pace']['expected']==360
+    assert metrics['HR']['expected']==140
+    assert result['prediction'] is None
+    assert evaluate(w['id'],'viet')==before
