@@ -19,6 +19,12 @@
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "owner": "vietle268s-team",
+    "extra": {
+      "eas": {
+        "projectId": "73a4ebd2-7f5b-4c4d-9df1-dc76fba590aa"
+      }
+    }
   }
 }
