@@ -78,12 +78,12 @@ function sourceName(sample: { sourceRevision?: { source?: { name?: string } } })
   return sample.sourceRevision?.source?.name?.trim() || null;
 }
 
-export async function readDailyHealth(daysBack = 35): Promise<DailyHealthSummary[]> {
+export async function readDailyHealth(daysBack = 35, authorize = true): Promise<DailyHealthSummary[]> {
   if (!(await isHealthDataAvailable())) {
     throw new Error('Apple Health is not available on this device.');
   }
 
-  await requestAuthorization({ toRead: [...HEALTH_TYPES] });
+  if (authorize) await requestAuthorization({ toRead: [...HEALTH_TYPES] });
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const endDate = new Date();
