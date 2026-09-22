@@ -12,9 +12,11 @@
   "dependencies": {
     "@kingstinct/react-native-healthkit": "16.0.0",
     "expo": "~57.0.23",
+    "expo-background-task": "~57.0.19",
     "expo-crypto": "~57.0.3",
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "expo-task-manager": "~57.0.19",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-nitro-modules": "0.37.1"
