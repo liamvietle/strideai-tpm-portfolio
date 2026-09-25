@@ -50,13 +50,14 @@ def learn(athlete, as_of=None, persist=True):
             "as_of": as_of.isoformat(),
         }
 
+    from app.effort import controlled, relative
+    max_hr = store.profile(athlete).max_hr
     easy = [
         o
         for o in obs
         if o["workout"]["kind"] == "easy"
         and not o["execution"]["pain"]
-        and o["execution"].get("rpe") is not None
-        and o["execution"]["rpe"] <= 4
+        and controlled(o["execution"],o["evaluation"],max_hr)
         and o["evaluation"].get("actual_pace")
         and o["execution"].get("average_hr")
     ]
@@ -71,7 +72,7 @@ def learn(athlete, as_of=None, persist=True):
         if easy
         else None,
         len(easy),
-        "Easy sessions confirmed at RPE ≤4; descriptive paired medians, not a causal curve.",
+        "Easy sessions screened by reported effort or available HR; descriptive paired medians, not a causal curve.",
     )
     hrv = [h["hrv_ms"] for h in health[-42:] if h.get("hrv_ms")]
     trait(
@@ -140,6 +141,10 @@ def learn(athlete, as_of=None, persist=True):
         "Completion under <6h vs ≥6h sleep; association only.",
     )
     historical = [r for r in store.runs(athlete) if r["date"] <= as_of.isoformat()]
+    effort_runs = [r for r in historical if relative(r) is not None and r.get('duration_seconds')]
+    trait('relative_effort_load', {'median_score':median(relative(r) for r in effort_runs),
+        'median_score_per_minute':round(median(relative(r)/(r['duration_seconds']/60) for r in effort_runs),2)} if effort_runs else None,
+        len(effort_runs), 'Strava workload scores; not subjective effort ratings or independent HR evidence.')
     weeks = {}
     for r in historical:
         d = date.fromisoformat(r["date"])
@@ -222,6 +227,7 @@ def can_relax(matches, health):
     """Require independent prospective successes plus next-day evidence; never learn from choice alone."""
     if len(matches) < 5:
         return False
+    from app.effort import effort_supported_success
     successful = []
     for o in matches:
         e = o["evaluation"]
@@ -243,8 +249,7 @@ def can_relax(matches, health):
             and e["comparison"] in {"within", "better"}
             and e["hr_error_bpm"] is not None
             and abs(e["hr_error_bpm"]) <= 5
-            and x.get("rpe") is not None
-            and x["rpe"] <= 4
+            and effort_supported_success(x,e)
             and not x["pain"]
             and following is not None
             and following.get("soreness") is not None

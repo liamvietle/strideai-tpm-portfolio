@@ -96,5 +96,10 @@ def estimate(target, day, runs, observations, max_hr=None, intensity=None, condi
             result['limitations'].append('Route ascent unknown: terrain matching unavailable.')
     else:
         result['limitations'].append('No expected weather or route ascent supplied; baseline retained.')
+    from app.effort import expected_effort
+    effort_target = dict(target)
+    if result.get('pace') is not None:
+        effort_target['duration_minutes'] = result['pace']*target['distance_km']/60
+    result['effort'] = expected_effort(similar,effort_target)
     result['quality'] = 'uncertain'
     return result

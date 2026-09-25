@@ -84,6 +84,7 @@ def workouts(athlete_id: str = "viet"):
             (athlete_id,),
         ).fetchall()
     result = []
+    run_map = {r['id']:r for r in store.runs(athlete_id)} if any(r['execution_json'] for r in rows) else {}
     history_inputs = None
     for row in rows:
         r = dict(row)
@@ -94,6 +95,13 @@ def workouts(athlete_id: str = "viet"):
             # UI needs evidence summary, not a duplicated longitudinal payload.
             r["prediction"].pop("context", None)
         if r["execution"]:
+            from app.strava_details import apply_details, split_metrics
+            if r['execution'].get('activity_id') in run_map:
+                r['execution'] = apply_details(r['execution'],run_map[r['execution']['activity_id']])
+            if r['evaluation'] and r['execution'].get('split_source'):
+                target = r['execution'].get('target_snapshot') or r['current']
+                r['evaluation'] = {**r['evaluation'], **split_metrics(r['execution']['splits'],target['kind']),
+                                   'detail_refresh': 'Split metrics refreshed from Strava; original plan decisions are unchanged.'}
             from app.workout_comparison import comparison_metrics
             if not r["execution"].get("target_snapshot"):
                 with connect() as c:
@@ -103,7 +111,7 @@ def workouts(athlete_id: str = "viet"):
                         (athlete_id,r['id'],r['execution_created_at'])).fetchone()
                 r['execution_target'] = json.loads(historical[0]) if historical else r['original']
             metrics = comparison_metrics(r)
-            if any(m['expected'] is None and m['metric'] in ('Pace','HR','RPE') for m in metrics):
+            if any(m['expected'] is None and m['metric'] in ('Pace','HR','RPE','Relative effort') for m in metrics):
                 from app.historical_expectation import estimate
                 if history_inputs is None:
                     history_inputs = (store.runs(athlete_id), store.observations(athlete_id), store.profile(athlete_id))
@@ -255,14 +263,15 @@ def weekly_review(week: date | None = None, athlete_id: str = "viet"):
             )
     fitness = "Insufficient controlled evidence to estimate fitness change; track matched easy-run pace/HR over multiple weeks."
     all_obs = store.observations(athlete_id)
+    from app.effort import controlled, relative
+    max_hr = store.profile(athlete_id).max_hr
     easy = [
         o
         for o in all_obs
         if o["workout"]["kind"] == "easy"
         and o["evaluation"].get("actual_pace")
         and o["execution"].get("average_hr")
-        and o["execution"].get("rpe") is not None
-        and o["execution"]["rpe"] <= 4
+        and controlled(o["execution"],o["evaluation"],max_hr)
         and not o["execution"]["pain"]
     ]
     a = [
@@ -304,7 +313,9 @@ def weekly_review(week: date | None = None, athlete_id: str = "viet"):
         "completed_km": round(synced_km + manual_km, 1),
         "planned_load_minutes_rpe": round(planned_load),
         "recorded_load_minutes_rpe": round(completed_load),
-        "load_coverage": f"{sum(o['execution'].get('rpe') is not None for o in obs)} of {len(all_runs) + len(manual)} recorded runs have evaluated RPE; incomplete load is not zero load.",
+        'relative_effort_total':round(sum(relative(r) for r in all_runs if relative(r) is not None),1),
+        'relative_effort_runs':sum(relative(r) is not None for r in all_runs),
+        "load_coverage": f"{sum(relative(r) is not None for r in all_runs)} of {len(all_runs)+len(manual)} runs have Strava Relative Effort. Missing scores are not zero workload.",
         "key_sessions": [
             {
                 "date": w["date"],
@@ -355,6 +366,7 @@ def execution_feedback(wid: int, payload: ExecutionFeedback, athlete_id: str = "
             raise HTTPException(409, "Wait for your run to sync first.")
         x = json.loads(row[0])
         x.update({k: v for k, v in payload.model_dump().items() if v is not None})
+        if payload.rpe is not None: x['effort_source']='manual'
         c.execute("UPDATE coach_executions SET execution_json=? WHERE workout_id=?", (json.dumps(x), wid))
     return {"saved": True}
 
