@@ -872,3 +872,40 @@ def test_personal_coach_pain_cannot_offer_keep_plan():
     result = coach.briefing(w['id'],'viet')
     assert result['briefing']['next_step_id'] == 'pause'
     assert result['evidence']['evaluation']['next_changes']
+
+
+@pytest.mark.parametrize('payload,expected', [
+    ({'status':'incomplete','incomplete_details':{'reason':'max_output_tokens'},'usage':{'output_tokens':2400}}, 'AI response reached its output limit before finishing'),
+    ({'status':'completed','output':[]}, 'AI returned no coaching text'),
+    ({'output_text':'{"message":"wrong format"}'}, 'AI response did not match the required coaching format'),
+    ({'output':[{'type':'message','content':[{'type':'refusal','refusal':'private provider text'}]}]}, 'AI provider declined to generate this commentary'),
+])
+def test_personal_coach_specific_failure_reasons(monkeypatch, payload, expected):
+    import httpx
+    from app import coach_briefing as coach
+    monkeypatch.setenv('OPENAI_API_KEY','test-key')
+    monkeypatch.setenv('STRIDEAI_COACH_AI_ENABLED','true')
+    def post(url, **kwargs):
+        schema = kwargs['json']['text']['format']['schema']
+        assert schema['properties']['next_step_id']['enum'] == ['pause']
+        assert schema['$defs']['Insight']['properties']['evidence_ids']['items']['enum'] == ['actual']
+        return httpx.Response(200,request=httpx.Request('POST',url),json=payload)
+    monkeypatch.setattr(coach.httpx,'post',post)
+    result,trace = coach.reason({'actual':{}},{'pause':'Pause.'},'post')
+    assert result is None
+    assert trace['reason'] == expected
+    assert 'private provider text' not in str(trace)
+    assert trace['usage'] == payload.get('usage',{})
+
+
+def test_personal_coach_fallback_reports_partial_data():
+    from app.coach_briefing import fallback_summary
+    w = {'execution':{'average_hr':135.5,'rpe':None},'evaluation':{'actual_pace':390,'prediction_valid':False}}
+    evidence = {'historical_estimate':{'metric_samples':{'pace':16,'hr':14,'rpe':0}}}
+    message,history = fallback_summary(w,evidence,'post')
+    assert '6:30/km' in message and '135.5 bpm' in message
+    assert 'Not recorded for this run: RPE.' in message
+    assert 'PACE (16 observations)' in history and 'HR (14 observations)' in history
+    assert 'retrospective' in history
+    w['execution']['rpe'] = 4
+    assert 'Not recorded' not in fallback_summary(w,evidence,'post')[0]

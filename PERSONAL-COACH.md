@@ -28,3 +28,9 @@ Mobile browser checks cover automatic Strava linking, review without RPE, visibl
 ## Later work
 
 Review live model outputs with real athlete cases after deployment. Add an explicit qualitative coaching evaluation set and cost/quality monitoring. Longer coach conversations, model-proposed multi-session changes with review/acceptance, and AI weekly narratives are separate follow-ups. This release provides individual pre/post-run interpretation and constrained next steps.
+
+## Response diagnostics and partial-data fallback
+
+Prompt version `personal-coach-2` restricts next-step IDs and evidence IDs in the provider JSON schema, as well as validating them locally. Fallback messages report actual metrics and historical coverage separately from prospective prediction availability. Incomplete output, absent text, refusal, malformed coaching format, unsupported actions and unknown citations have distinct sanitized diagnostics. Usage survives failure when returned by the provider. The version bump prevents reuse of old generic failure messages.
+
+Ten focused coaching tests pass, including incomplete responses, empty output, refusal, invalid format and partial pace/HR coverage with no RPE. The previous live generic failure cannot be retrospectively attributed to one of these causes; a fresh request is needed. No data migration or environment change is required.

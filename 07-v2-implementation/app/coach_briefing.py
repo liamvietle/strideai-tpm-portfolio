@@ -10,14 +10,14 @@ import time
 
 import httpx
 from fastapi import HTTPException
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from app import athlete_store as store
 from app.athlete_models import StrictModel
 from app.explanation import DEFAULT_MODEL, OPENAI_RESPONSES_URL, _extract_output_text
 from app.storage import connect
 
-VERSION = 'personal-coach-1'
+VERSION = 'personal-coach-2'
 
 
 class Insight(StrictModel):
@@ -118,12 +118,49 @@ def build_context(w, athlete):
     return stage, evidence, actions
 
 
+class ResponseProblem(ValueError):
+    """A fixed, user-safe diagnostic; never includes provider text or athlete data."""
+
+
+def response_schema(evidence, actions):
+    schema = Briefing.model_json_schema()
+    schema['properties']['next_step_id']['enum'] = list(actions)
+    schema['$defs']['Insight']['properties']['evidence_ids']['items']['enum'] = list(evidence)
+    return schema
+
+
+def fallback_summary(w, evidence, stage):
+    if stage == 'pre':
+        return w['prediction']['reason'], 'Your saved expectation and evidence remain available below.'
+    x = w['execution']
+    values = []
+    pace = w['evaluation'].get('actual_pace')
+    if pace is not None:
+        seconds = round(pace)
+        values.append(f"pace {seconds//60}:{seconds%60:02d}/km")
+    if x.get('average_hr') is not None:
+        values.append(f"average HR {x['average_hr']:g} bpm")
+    if x.get('rpe') is not None:
+        values.append(f"RPE {x['rpe']:g}/10")
+    message = 'Your run is recorded' + (': ' + ', '.join(values) if values else '.')
+    if values: message += '.'
+    missing = [name for name,value in [('pace',pace),('HR',x.get('average_hr')),('RPE',x.get('rpe'))] if value is None]
+    if missing: message += ' Not recorded for this run: ' + ', '.join(missing) + '.'
+    counts = evidence['historical_estimate']['metric_samples']
+    available = [f"{name.upper()} ({count} observations)" for name,count in counts.items() if count >= 3]
+    history = 'Historical comparison is available for ' + ', '.join(available) + '.' if available else 'There are too few comparable earlier runs for a historical estimate.'
+    if not w['evaluation'].get('prediction_valid'):
+        history += ' No usable pre-run prediction is saved for this result; historical estimates are retrospective.'
+    return message, history
+
+
 def reason(evidence, actions, stage):
     model = os.getenv('STRIDEAI_COACH_MODEL', os.getenv('OPENAI_MODEL', DEFAULT_MODEL))
     trace = {'provider':'deterministic', 'fallback':True, 'reason':'AI coaching is disabled or not configured', 'prompt_version':VERSION}
     if os.getenv('STRIDEAI_COACH_AI_ENABLED','false').lower() != 'true' or not os.getenv('OPENAI_API_KEY'):
         return None, trace
     started = time.monotonic()
+    diagnostics = {}
     try:
         r = httpx.post(OPENAI_RESPONSES_URL, timeout=25,
             headers={'Authorization':'Bearer '+os.environ['OPENAI_API_KEY']},
@@ -134,22 +171,36 @@ PRE: relate today's check-in, recent load, race phase, comparable outcomes and w
 POST: explain the actual run, its intended purpose, and how it compares to comparable prior runs. Distinguish time-limited shortening from physiological strain. Lower HR at slower pace alone does not prove improved fitness. Do not infer missing RPE, drift, completion intent, weather effects or symptoms. Label retrospective estimates explicitly. Do not claim a saved prediction exists when prediction_valid is false. Respect sample counts and missing data. Learn cautiously: describe what this observation adds and what repeated evidence would be needed.
 Choose a next_step_id ONLY from allowed_next_steps. You cannot prescribe new distances, paces, HR limits, changes to the plan, or override pain/recovery restrictions, even if the user declined advice. Future steps are proposals for the next check-in; never claim a change was applied unless evaluation.next_changes says so. Author prose about interpretation, not additional training prescriptions. Cite supplied top-level evidence IDs on each insight. Do not repeat the same point across fields. Keep each insight to one or two short sentences. No markdown. Output the JSON schema.''',
                   'input':json.dumps({'stage':stage,'evidence':evidence,'allowed_next_steps':actions},default=str),
-                  'text':{'format':{'type':'json_schema','name':'personal_coach','strict':True,'schema':Briefing.model_json_schema()}}})
+                  'text':{'format':{'type':'json_schema','name':'personal_coach','strict':True,'schema':response_schema(evidence, actions)}}})
         r.raise_for_status()
-        result = Briefing.model_validate_json(_extract_output_text(r.json()))
+        payload = r.json()
+        diagnostics['usage'] = payload.get('usage') or {}
+        if payload.get('status') == 'incomplete':
+            limited = (payload.get('incomplete_details') or {}).get('reason') == 'max_output_tokens'
+            raise ResponseProblem('AI response reached its output limit before finishing' if limited else 'AI provider returned an incomplete response')
+        if payload.get('status') in ('failed','cancelled'):
+            raise ResponseProblem('AI provider did not complete the response')
+        text = _extract_output_text(payload)
+        if not text:
+            refused = any(part.get('type') == 'refusal' for item in payload.get('output',[]) for part in item.get('content',[]))
+            raise ResponseProblem('AI provider declined to generate this commentary' if refused else 'AI returned no coaching text')
+        result = Briefing.model_validate_json(text)
         if result.next_step_id not in actions:
-            raise ValueError('Unapproved next step')
+            raise ResponseProblem('AI selected an unsupported next step')
         for insight in (result.message,result.historical_context,result.learning):
             if not set(insight.evidence_ids) <= set(evidence):
-                raise ValueError('Unknown evidence citation')
+                raise ResponseProblem('AI cited evidence outside the supplied records')
         return result.model_dump(), dict(provider='openai',model=model,fallback=False,prompt_version=VERSION,
             latency_ms=round((time.monotonic()-started)*1000),usage=r.json().get('usage',{}))
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         reason = 'AI response unavailable or failed validation'
-        if isinstance(exc,httpx.TimeoutException): reason = 'AI request timed out'
+        if isinstance(exc,ResponseProblem): reason = str(exc)
+        elif isinstance(exc,ValidationError): reason = 'AI response did not match the required coaching format'
+        elif isinstance(exc,json.JSONDecodeError): reason = 'AI provider returned unreadable JSON'
+        elif isinstance(exc,httpx.TimeoutException): reason = 'AI request timed out'
         elif isinstance(exc,httpx.HTTPStatusError):
             reason = {401:'API key rejected',403:'Model access denied',429:'API quota or rate limit reached'}.get(exc.response.status_code,'AI provider error')
-        return None, {**trace,'provider':'openai','model':model,'reason':reason}
+        return None, {**trace,'provider':'openai','model':model,'reason':reason,**diagnostics}
 
 
 def briefing(wid, athlete, retry=False):
@@ -180,10 +231,11 @@ def briefing(wid, athlete, retry=False):
     generated,trace = reason(evidence,actions,stage)
     fallback_action = next(iter(actions))
     if generated is None:
+        summary, history = fallback_summary(w,evidence,stage)
         generated = {
-            'message':{'text':w['evaluation']['explanation'] if stage=='post' else w['prediction']['reason'],
-                       'evidence_ids':['evaluation' if stage=='post' else 'recommendation']},
-            'historical_context':{'text':'Your comparison details below show the available history and any missing evidence.', 'evidence_ids':['comparison' if stage=='post' else 'expectation']},
+            'message':{'text':summary,
+                       'evidence_ids':['actual','evaluation'] if stage=='post' else ['recommendation']},
+            'historical_context':{'text':history, 'evidence_ids':['historical_estimate','evaluation'] if stage=='post' else ['expectation']},
             'learning':{'text':'Use repeated comparable sessions to assess a pattern. A single run does not establish a change in fitness.', 'evidence_ids':['workout']},
             'next_step_id':fallback_action, 'uncertainty':'Personal AI commentary is unavailable. Your saved targets and safety guidance still apply.'}
     result = {'status':'ready','stage':stage,'created_at':store.now(),'briefing':generated,
