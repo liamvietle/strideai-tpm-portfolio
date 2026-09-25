@@ -432,6 +432,11 @@ def execute(wid, payload, athlete):
             source="synced_activity",
             rpe=payload.rpe if payload.rpe is not None else activity.get("rpe"),
         )
+        from app.strava_details import apply_details
+        x['effort_source'] = 'manual' if payload.rpe is not None else 'strava'
+        x = apply_details(x, activity)
+        if payload.rpe is not None:
+            x['effort_source'] = 'manual'
         if x["distance_km"] is None or x["duration_seconds"] is None:
             raise HTTPException(422, "Activity lacks distance or duration.")
         if pred:
@@ -490,6 +495,7 @@ def execute(wid, payload, athlete):
 
 def evaluate(wid, athlete):
     store.init_athlete_db()
+    run_map = {r['id']:r for r in store.runs(athlete)}
     with connect() as c:
         c.execute("BEGIN IMMEDIATE")
         row = store.workout(c, wid, athlete)
@@ -504,6 +510,9 @@ def evaluate(wid, athlete):
         if not execution:
             raise HTTPException(409, "Record the executed workout first.")
         x = json.loads(execution[0])
+        if x.get('activity_id') in run_map:
+            from app.strava_details import apply_details
+            x = apply_details(x,run_map[x['activity_id']])
         w = json.loads(row["original_json"])
         current = json.loads(row["current_json"])
         prediction = c.execute(
@@ -541,29 +550,9 @@ def evaluate(wid, athlete):
         pace_error = error(pace, "pace")
         hr_error = error(x["average_hr"], "hr")
         rpe_error = error(x["rpe"], "rpe")
-        splits = x["splits"]
-        drift = consistency = None
-        if len(splits) >= 4:
-            paces = [s["duration_seconds"] / s["distance_km"] for s in splits]
-            consistency = round(pstdev(paces) / mean(paces) * 100, 2)
-            half = len(splits) // 2
-            a, b = splits[:half], splits[half:]
-            # Report decoupling only for steady sessions with complete HR and stable pace.
-            if (
-                target["kind"] in {"easy", "long"}
-                and consistency <= 10
-                and all(s["average_hr"] for s in splits)
-            ):
-
-                def efficiency(group):
-                    duration = sum(s["duration_seconds"] for s in group)
-                    hr = (
-                        sum(s["average_hr"] * s["duration_seconds"] for s in group)
-                        / duration
-                    )
-                    return sum(s["distance_km"] for s in group) / duration / hr
-
-                drift = round((1 - efficiency(b) / efficiency(a)) * 100, 2)
+        from app.strava_details import split_metrics
+        split_analysis = split_metrics(x['splits'],target['kind'])
+        drift,consistency = split_analysis['hr_drift_pct'],split_analysis['pace_consistency_cv_pct']
         from app.post_run_policy import recovery_response
         recovery = recovery_response(x, completion, hr_error, rpe_error, drift)
         short = not x["completed"] or completion < .9
@@ -572,7 +561,6 @@ def evaluate(wid, athlete):
             expected
             and pace_error is not None
             and hr_error is not None
-            and rpe_error is not None
         )
         pace_matched = (
             pace_error is not None
@@ -592,6 +580,7 @@ def evaluate(wid, athlete):
             enough
             and not abnormal
             and not short
+            and rpe_error is not None
             and rpe_error <= -1
             and hr_error <= 0
             and abs(pace_error) <= expected["pace"] * 0.05
@@ -606,7 +595,12 @@ def evaluate(wid, athlete):
                 else ("shortened" if short else "completed")
             )
         )
+        from app.effort import relative
+        effort_expected = (expected or {}).get('effort') or {}
+        actual_effort = relative(x)
         result = {
+            'actual_effort':x.get('effort') or {},
+            'relative_effort_error':round(actual_effort-effort_expected['relative'],1) if actual_effort is not None and effort_expected.get('relative') is not None else None,
             "workout_id": wid,
             "actual_pace": round(pace, 2) if pace else None,
             "expected": expected,
@@ -634,10 +628,10 @@ def evaluate(wid, athlete):
             "prediction_valid": bool(expected),
             "explanation": {
                 "worse": "Below the saved expectation: completion, effort or physiological response raised a concern.",
-                "within": "Within the saved athlete-specific expectation.",
+                "within": "Available pace and HR are within the saved athlete-specific expectation.",
                 "better": "Lower effort than expected with normal HR and controlled pace.",
                 "different_execution": "Pace differed from the saved expectation; HR and effort did not show a clear worse response. Review execution and conditions.",
-                "insufficient_data": "Outcome recorded; not enough prospective pace, HR and RPE evidence for an expectation verdict.",
+                "insufficient_data": "Outcome recorded. Available metrics can be compared with history; a complete saved pace/HR prediction is unavailable.",
             }[comparison],
             "limitations": [
                 "HR drift requires at least four full-run splits with HR and steady pacing.",

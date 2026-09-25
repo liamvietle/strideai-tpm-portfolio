@@ -51,7 +51,7 @@ STRAVA_SCRIPT = r'''
       const data=await stravaApi('/app/api/strava/sync',{method:'POST'});
       lastAutoSync=Date.now();
       window.dispatchEvent(new Event('strideai:strava-synced'));
-      if(status)status.textContent=`Synced ${data.activities??data.fetched} recent activities (${data.running_activities} runs): ${data.inserted} new, ${data.updated} updated.`;
+      if(status)status.textContent=`Synced ${data.activities??data.fetched} recent activities (${data.running_activities} runs): ${data.inserted} new, ${data.updated} updated. ${data.details_refreshed??0} runs enriched with available splits/effort; older details backfill gradually.`;
       return data;
     }catch(err){
       if(status&&!silent)status.textContent=err.message;

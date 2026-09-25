@@ -904,7 +904,7 @@ def test_personal_coach_fallback_reports_partial_data():
     evidence = {'historical_estimate':{'metric_samples':{'pace':16,'hr':14,'rpe':0}}}
     message,history = fallback_summary(w,evidence,'post')
     assert '6:30/km' in message and '135.5 bpm' in message
-    assert 'Not recorded for this run: RPE.' in message
+    assert 'Not recorded for this run: effort.' in message
     assert 'PACE (16 observations)' in history and 'HR (14 observations)' in history
     assert 'retrospective' in history
     w['execution']['rpe'] = 4

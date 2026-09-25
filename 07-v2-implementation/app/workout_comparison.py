@@ -40,4 +40,19 @@ def comparison_metrics(workout):
         result.append(dict(samples=samples, metric=metric, expected=expected, target_range=bounds,
             actual=actual, difference=round(actual-expected, 2) if actual is not None and expected is not None else None,
             basis=basis if expected is not None else 'No saved target'))
+    from app.effort import relative
+    effort_prediction = forecast.get('effort') or {}
+    effort_estimate = retrospective.get('effort') or {}
+    expected = effort_prediction.get('relative')
+    basis = 'Pre-run prediction'
+    source = effort_prediction
+    if expected is None:
+        expected = effort_estimate.get('relative')
+        source = effort_estimate
+        basis = 'Historical estimate (retrospective)'
+    actual = relative(execution)
+    if actual is not None or expected is not None:
+        result.append(dict(metric='Relative effort',expected=expected,actual=actual,target_range=None,
+        samples=source.get('samples',0),basis=basis if expected is not None else 'Insufficient comparable effort history',
+        difference=round(actual-expected,1) if actual is not None and expected is not None else None))
     return result

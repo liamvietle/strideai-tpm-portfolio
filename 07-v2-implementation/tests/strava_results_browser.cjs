@@ -10,6 +10,9 @@ const race=new Date(today+'T12:00:00Z');race.setUTCDate(race.getUTCDate()+90);
 const goal=await api('/app/api/goal',{name:'Test',race_date:race.toISOString().slice(0,10),goal_minutes:230},'PUT');
 await api('/app/api/plan',{race_id:goal.id,days:[{date:today,distance_km:5,activity:'run',note:'Easy run'}]});await api('/app/api/journey/activate-import',{});
 execFileSync('python',['-c',`from app.storage import upsert_activities\nfrom app.models import ActivityRecord\nupsert_activities([ActivityRecord(source='strava',source_activity_id='browser',athlete_id='viet',start_time='${today}T00:00:00Z',activity_type='Run',raw_format='strava-api-summary',distance_km=5,duration_seconds=1800,average_hr=140)])`]);
+if(process.env.DETAILS_FIXTURE){
+execFileSync('python',['-c',`import json\nfrom app import athlete_store as store\nfrom app.storage import connect\nfrom app.strava_details import normalize\nstore.init_athlete_db()\ndata=normalize({'suffer_score':42,'splits_metric':[{'distance':1000,'moving_time':360,'average_heartrate':138+i} for i in range(5)]},{},5,1800)\nwith connect() as c:\n c.execute("INSERT INTO strava_run_details SELECT id,athlete_id,?,CURRENT_TIMESTAMP,9999999999,'available' FROM activities WHERE source_activity_id='browser'",(json.dumps(data),))`]);
+}
 if(process.env.COACH_PREVIEW){
  await page.route('**/app/api/coach/workouts/*/briefing',async route=>{
   const response=await route.fetch(), d=await response.json();
@@ -24,13 +27,16 @@ if(process.env.COACH_PREVIEW){
 await page.goto(base+'/app');
 await page.getByRole('button',{name:'Review my result',exact:true}).click();
 await page.getByText('Run synced · ready to review',{exact:true}).waitFor();
+if(await page.locator('[name=rpe]').count())throw Error('Manual RPE entry should be removed');
 if(await page.locator('#ex_distance').count())throw Error('Should not show metric entry for synced run');
 await page.locator('#coachDetail').getByRole('button',{name:'Review my result',exact:true}).click();
+await page.waitForLoadState('networkidle');
 await page.getByText('Run details and comparison evidence',{exact:true}).click();
 await page.getByRole('heading',{name:'Expected vs actual',exact:true}).waitFor();
 await page.getByText(process.env.COACH_PREVIEW?'AI coach · test-model':'Saved guidance · AI commentary unavailable',{exact:true}).waitFor();
 if(!await page.getByRole('region',{name:'Your coach'}).isVisible())throw Error('Coach message missing');
 const rows=await api('/app/api/coach/workouts',undefined,'GET');
+if(process.env.DETAILS_FIXTURE){if(rows[0].execution.effort.relative!==42||rows[0].execution.splits.length!==5||rows[0].evaluation.hr_drift_pct==null)throw Error('Imported effort and HR splits missing');await page.getByText('5 run splits · strava_splits_metric',{exact:true}).click();await page.getByText('1: 1.00 km · 6:00/km · HR 138',{exact:true}).waitFor();}
 if(rows[0].execution.distance_km!==5||rows[0].execution.rpe!==null||!rows[0].evaluation)throw Error('Review failed');
 if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow');
 await page.getByText('Run details and comparison evidence',{exact:true}).click();

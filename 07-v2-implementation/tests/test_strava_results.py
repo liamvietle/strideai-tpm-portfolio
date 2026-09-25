@@ -69,6 +69,7 @@ def test_effort_detail_lookup_and_failure_do_not_lose_metrics(workout, monkeypat
     import httpx
     run()
     class Response:
+        status_code=200
         def raise_for_status(self): pass
         def json(self): return {'id':1,'perceived_exertion':7}
     monkeypatch.setattr('app.strava_integration.httpx.get',lambda *a,**kw:Response())
@@ -80,4 +81,4 @@ def test_effort_detail_lookup_and_failure_do_not_lose_metrics(workout, monkeypat
     _enrich_pending_effort('viet',{})
     reconcile('viet')
     assert workouts()[0]['execution']['distance_km']==5
-    assert workouts()[0]['execution']['rpe'] is None
+    assert workouts()[0]['execution']['rpe']==7

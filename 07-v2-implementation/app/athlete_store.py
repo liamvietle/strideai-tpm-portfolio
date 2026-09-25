@@ -17,6 +17,10 @@ def init_athlete_db():
     init_plan_db()
     with connect() as c:
         c.executescript("""
+        CREATE TABLE IF NOT EXISTS strava_run_details(
+            activity_id INTEGER PRIMARY KEY, athlete_id TEXT NOT NULL, data_json TEXT,
+            fetched_at TEXT, next_at REAL NOT NULL, status TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS strava_detail_sync(athlete_id TEXT PRIMARY KEY,next_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS athlete_loop_migrations(version INTEGER PRIMARY KEY, applied_at TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS athlete_profiles(athlete_id TEXT PRIMARY KEY, profile_json TEXT NOT NULL, updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS coach_workouts(
@@ -89,9 +93,10 @@ def workout(c, wid, athlete):
 
 
 def runs(athlete):
+    init_athlete_db()
     with connect() as c:
         rows = c.execute(
-            "SELECT a.*,aw.weather_json FROM activities a LEFT JOIN activity_weather aw ON aw.activity_id=a.id AND aw.status='available' WHERE a.athlete_id=? AND lower(a.activity_type) IN ('run','running','trailrun','virtualrun') ORDER BY a.start_time",
+            "SELECT a.*,aw.weather_json,sd.data_json AS details_json,sd.fetched_at AS details_fetched_at FROM activities a LEFT JOIN strava_run_details sd ON sd.activity_id=a.id AND sd.athlete_id=a.athlete_id LEFT JOIN activity_weather aw ON aw.activity_id=a.id AND aw.status='available' WHERE a.athlete_id=? AND lower(a.activity_type) IN ('run','running','trailrun','virtualrun') ORDER BY a.start_time",
             (athlete,),
         ).fetchall()
     result = []
@@ -128,7 +133,11 @@ def runs(athlete):
         except (ValueError, TypeError):
             r['weather'] = {}
         r["session_kind"] = "race" if r.get("source") == "strava" and raw.get("workout_type") == 1 else None
-        effort = raw.get("perceived_exertion") if r.get("source") == "strava" else None
+        from app.strava_details import effort as sourced_effort
+        details = json.loads(r.pop('details_json') or '{}')
+        r.update({k:v for k,v in details.items() if k != 'effort'})
+        r['effort'] = details.get('effort') or (sourced_effort(raw) if r.get('source')=='strava' else {})
+        effort = r['effort'].get('perceived') # Strava 1–10 reported effort only.
         # Opportunistic only: Strava does not document this as a stable API field.
         r["rpe"] = effort if type(effort) in (int, float) and 1 <= effort <= 10 else None
         # Raw wearable payloads and locations do not enter the AI evidence package.
@@ -149,6 +158,7 @@ def observations(athlete):
             (athlete,),
         ).fetchall()
     result = []
+    run_map = {r['id']:r for r in runs(athlete)}
     for r in rows:
         pred = json.loads(r["prediction_json"]) if r["prediction_json"] else None
         # Keep retrieved cases flat: embedding full prior context recursively grows exponentially.
@@ -165,14 +175,21 @@ def observations(athlete):
             else json.loads(r["current_json"])
         )
         performed = pred["recommended"] if pred and r["choice"] == "accept" else planned
+        from app.strava_details import apply_details, split_metrics
+        execution = json.loads(r['execution_json'])
+        if execution.get('activity_id') in run_map:
+            execution = apply_details(execution,run_map[execution['activity_id']])
+        evaluation = json.loads(r['evaluation_json'])
+        if execution.get('split_source'):
+            evaluation = {**evaluation,**split_metrics(execution['splits'],performed['kind'])}
         result.append(
             {
                 "date": r["date"],
                 "workout": performed,
                 "prediction": summary,
                 "choice": r["choice"],
-                "execution": json.loads(r["execution_json"]),
-                "evaluation": json.loads(r["evaluation_json"]),
+                "execution": execution,
+                "evaluation": evaluation,
             }
         )
     return result

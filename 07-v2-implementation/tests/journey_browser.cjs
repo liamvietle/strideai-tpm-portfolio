@@ -72,7 +72,7 @@ await page.getByRole('button',{name:'Check my run result',exact:true}).waitFor()
 }
 await page.waitForLoadState('networkidle');
 await page.getByText('Choose a run or enter manually',{exact:true}).click();
-await page.locator('#ex_distance').fill('5');await page.locator('#ex_duration').fill('35');await page.locator('#ex_hr').fill('138');await page.locator('#ex_rpe').fill('3');
+await page.locator('#ex_distance').fill('5');await page.locator('#ex_duration').fill('35');await page.locator('#ex_hr').fill('138');
 await page.getByRole('button',{name:'Save execution and evaluate',exact:true}).click();
 await page.getByText('Run details and comparison evidence',{exact:true}).click();
 await page.getByRole('heading',{name:'Expected vs actual',exact:true}).waitFor();
