@@ -174,3 +174,35 @@ def test_lap_hr_is_retained_when_metric_splits_have_no_hr():
     out=normalize(detail,{},5,1800)
     assert out['split_source']=='strava_laps'
     assert len(out['splits'])==4 and len(out['pace_splits'])==5
+
+
+def test_fast_finish_hr_rise_is_not_steady_effort_drift():
+    rows=[{'distance_km':1,'duration_seconds':420,'average_hr':130} for _ in range(5)]
+    rows.append({'distance_km':1,'duration_seconds':360,'average_hr':155})
+    result=split_metrics(rows,'easy',183,167)
+    assert result['hr_drift_pct'] is None
+    context=result['pace_hr_context']
+    assert context['status']=='faster_finish'
+    assert context['finish_pace_change_pct']==-14.3
+    assert context['finish_hr_change_bpm']==25
+    zones=context['hr_zones']
+    assert zones['finish_pct_max']==84.7
+    assert zones['finish_pct_threshold']==92.8
+    assert zones['estimated_seconds_by_split_average']['Z4']==360
+    assert not zones['exact_time_in_zones_available']
+
+
+def test_steady_pace_hr_rise_retains_drift_and_partial_hr_is_unknown():
+    rows=[{'distance_km':1,'duration_seconds':400,'average_hr':hr} for hr in [130,130,145,145]]
+    result=split_metrics(rows,'easy',183)
+    assert result['hr_drift_pct']>7
+    assert result['pace_hr_context']['status']=='steady_pace'
+    rows[-1]['average_hr']=None
+    assert split_metrics(rows,'easy')['hr_drift_pct'] is None
+    assert not split_metrics(rows,'easy')['pace_hr_context']['hr_zones']['available']
+
+
+def test_slowing_finish_is_not_steady_effort_drift():
+    rows=[{'distance_km':1,'duration_seconds':pace,'average_hr':140} for pace in [360,360,360,420]]
+    assert split_metrics(rows,'long')['hr_drift_pct'] is None
+    assert split_metrics(rows,'long')['pace_hr_context']['status']=='variable_pace'
