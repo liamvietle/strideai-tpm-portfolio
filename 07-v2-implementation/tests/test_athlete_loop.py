@@ -763,3 +763,112 @@ def test_review_estimates_from_prior_runs_without_mutating_evaluation():
     assert metrics['HR']['expected']==140
     assert result['prediction'] is None
     assert evaluate(w['id'],'viet')==before
+
+
+def test_personal_coach_pre_run_cache_choice_and_safety(monkeypatch):
+    from app import coach_briefing as coach
+    w = setup()
+    check()
+    predict(w['id'], 'viet')
+    calls = []
+    def reason(evidence, actions, stage):
+        calls.append((evidence, actions, stage))
+        return None, {'fallback': True, 'reason': 'Offline', 'provider': 'deterministic'}
+    monkeypatch.setattr(coach, 'reason', reason)
+    first = coach.briefing(w['id'], 'viet')
+    assert first['stage'] == 'pre'
+    assert first == coach.briefing(w['id'], 'viet')
+    assert first == coach.briefing(w['id'], 'viet', retry=True)
+    assert len(calls) == 1
+    assert first['evidence']['daily_state']['sleep_hours'] == 8
+    with connect() as c:
+        saved = c.execute('SELECT prediction_json FROM coach_predictions WHERE workout_id=?',(w['id'],)).fetchone()[0]
+    store.patch_profile({'active_injury': True})
+    paused = coach.briefing(w['id'], 'viet')
+    assert paused['briefing']['next_step_id'] == 'pause'
+    assert paused['safety_notice']
+    with connect() as c:
+        assert c.execute('SELECT prediction_json FROM coach_predictions WHERE workout_id=?',(w['id'],)).fetchone()[0] == saved
+    with pytest.raises(HTTPException) as err:
+        coach.briefing(w['id'], 'another-athlete')
+    assert err.value.status_code == 404
+
+
+def test_personal_coach_post_run_history_and_no_mutation(monkeypatch):
+    from app import coach_briefing as coach
+    w = setup()
+    for i in range(1,5):
+        upsert_activities([ActivityRecord(source='strava',source_activity_id=f'coach-{i}',athlete_id='viet',
+            start_time=f'{DAY-timedelta(days=i)}T00:00:00Z',activity_type='Run',raw_format='strava-api-summary',
+            distance_km=w['current']['distance_km'],duration_seconds=round(w['current']['distance_km']*sum(w['current']['pace_target'])/2),average_hr=140)])
+    # Future activity must never become a historical comparator.
+    upsert_activities([ActivityRecord(source='strava',source_activity_id='future',athlete_id='viet',
+        start_time=f'{DAY+timedelta(days=1)}T00:00:00Z',activity_type='Run',raw_format='strava-api-summary',
+        distance_km=w['current']['distance_km'],duration_seconds=round(w['current']['distance_km']*sum(w['current']['pace_target'])/2),average_hr=140)])
+    execute(w['id'],Execution(distance_km=w['current']['distance_km']*.85,duration_seconds=2000,average_hr=135,completed=False,shortened_reason='availability'), 'viet')
+    evaluation = evaluate(w['id'],'viet')
+    before = workouts()
+    result = coach.briefing(w['id'],'viet')
+    assert result['stage'] == 'post'
+    assert result['evidence']['interpretation_limits']['prediction_valid'] is False
+    assert len(result['evidence']['comparable_runs']) == 4
+    assert all(r['date'] < DAY.isoformat() for r in result['evidence']['comparable_runs'])
+    assert result['evidence']['actual']['rpe'] is None
+    assert result['evidence']['actual']['shortened_reason'] == 'availability'
+    assert result['briefing']['next_step_id'] == 'keep_plan'
+    assert before == workouts()
+    assert evaluation == evaluate(w['id'],'viet')
+
+
+def test_personal_coach_validates_model_output(monkeypatch):
+    import httpx
+    from app import coach_briefing as coach
+    monkeypatch.setenv('OPENAI_API_KEY','test-key')
+    monkeypatch.setenv('STRIDEAI_COACH_AI_ENABLED','true')
+    monkeypatch.setenv('STRIDEAI_COACH_MODEL','gpt-5-mini')
+    item = {'text':'You kept the effort controlled.','evidence_ids':['actual']}
+    output = {'message':item,'historical_context':item,'learning':item,'next_step_id':'pause','uncertainty':'One observation is not a trend.'}
+    def post(url, **kwargs):
+        assert kwargs['json']['store'] is False
+        assert kwargs['json']['max_output_tokens'] == 2400
+        return httpx.Response(200,request=httpx.Request('POST',url),json={'output_text':json.dumps(output), 'usage':{'input_tokens':50,'output_tokens':100}})
+    monkeypatch.setattr(coach.httpx,'post',post)
+    result, trace = coach.reason({'actual':{'pain':True}}, {'pause':'Pause running.'}, 'post')
+    assert result and trace['fallback'] is False
+    assert trace['usage']['input_tokens'] == 50
+    output['next_step_id'] = 'increase_mileage'
+    assert coach.reason({'actual':{}},{'pause':'Pause.'},'post')[0] is None
+    output['next_step_id'] = 'pause'
+    output['learning'] = {'text':'Invented comparison','evidence_ids':['unknown_run']}
+    assert coach.reason({'actual':{}},{'pause':'Pause.'},'post')[0] is None
+
+
+def test_personal_coach_provider_failure_and_pending(monkeypatch):
+    import httpx
+    from app import coach_briefing as coach
+    w = setup()
+    client = TestClient(app)
+    assert client.post(f"/app/api/coach/workouts/{w['id']}/briefing").status_code == 409
+    check()
+    predict(w['id'],'viet')
+    monkeypatch.setenv('OPENAI_API_KEY','test-key')
+    monkeypatch.setenv('STRIDEAI_COACH_AI_ENABLED','true')
+    def post(url, **kwargs):
+        return httpx.Response(429,request=httpx.Request('POST',url))
+    monkeypatch.setattr(coach.httpx,'post',post)
+    result = client.post(f"/app/api/coach/workouts/{w['id']}/briefing").json()
+    assert result['ai_trace']['fallback']
+    assert result['ai_trace']['reason'] == 'API quota or rate limit reached'
+    with connect() as c:
+        c.execute('UPDATE coach_briefings SET result_json=NULL')
+    assert coach.briefing(w['id'],'viet') == {'status':'pending'}
+
+
+def test_personal_coach_pain_cannot_offer_keep_plan():
+    from app import coach_briefing as coach
+    w = setup()
+    execute(w['id'],Execution(distance_km=3,duration_seconds=1000,pain=True,completed=False),'viet')
+    evaluate(w['id'],'viet')
+    result = coach.briefing(w['id'],'viet')
+    assert result['briefing']['next_step_id'] == 'pause'
+    assert result['evidence']['evaluation']['next_changes']

@@ -15,6 +15,7 @@ await page.getByRole('button',{name:'Review my result',exact:true}).click();
 await page.getByText('Run synced · ready to review',{exact:true}).waitFor();
 if(await page.locator('#ex_distance').count())throw Error('Should not show metric entry for synced run');
 await page.locator('#coachDetail').getByRole('button',{name:'Review my result',exact:true}).click();
+await page.getByText('Run details and comparison evidence',{exact:true}).click();
 await page.getByRole('heading',{name:'Expected vs actual',exact:true}).waitFor();
 const rows=await api('/app/api/coach/workouts',undefined,'GET');
 if(rows[0].execution.distance_km!==5||rows[0].execution.rpe!==null||!rows[0].evaluation)throw Error('Review failed');

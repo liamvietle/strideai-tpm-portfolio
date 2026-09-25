@@ -378,3 +378,9 @@ def save_late_checkin(wid: int, payload: LateCheckin, athlete_id: str = 'viet'):
 def test_coach_connection(athlete_id: str = 'viet'):
     from app.late_checkin import test_connection
     return test_connection(athlete_id)
+
+
+@router.post('/workouts/{wid}/briefing')
+def workout_briefing(wid: int, retry: bool = False, athlete_id: str = 'viet'):
+    from app.coach_briefing import briefing
+    return briefing(wid, athlete_id, retry)

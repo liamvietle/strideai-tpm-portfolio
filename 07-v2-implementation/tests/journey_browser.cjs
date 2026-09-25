@@ -65,11 +65,16 @@ if(process.env.MODE==='recordskip'){await page.locator('#recordWithoutPrediction
 await page.locator('#journeyCheckinButton').click();if(await page.locator('#days_until_event').isVisible()||await page.locator('#soreness_0_10').isVisible())throw Error('Removed check-in fields visible');if(await page.locator('#hrv_ms').isVisible())throw Error('Optional health fields should be collapsed');if(process.env.MODE==='import')await page.locator('#planned_intensity').selectOption('easy');if(process.env.MODE==='weather')await page.locator('#subjective_fatigue').selectOption('sore');await page.locator('#sleep_hours').fill('08:00');await page.screenshot({path:'/tmp/strideai-simple-checkin.png',fullPage:true});await page.locator('#recommendBtn').click();await page.waitForFunction(()=>document.getElementById('submitStatus').textContent.includes('Decision locked'));if(process.env.MODE==='weather'){const h=await (await page.request.get('http://127.0.0.1:8765/app/api/history?limit=1')).json();if(h[0].soreness_0_10!==5)throw Error('Combined soreness selection not recorded');}
 await page.locator('#coachDetail').waitFor();if(await page.locator('#ex_distance').isVisible())throw Error('Execution fields visible before reviewing targets');
 await page.getByRole('button',{name:'Lock pre-run expectation',exact:true}).click();
+await page.getByRole('heading',{name:'Your coach · before your run',exact:true}).waitFor();
+await page.getByText('Saved guidance · AI commentary unavailable',{exact:true}).waitFor();
 await page.getByRole('button',{name:'Accept adjustment',exact:true}).click();
-await page.getByRole('button',{name:'I’ve finished my run',exact:true}).waitFor();await page.reload();await page.getByRole('button',{name:'I’ve finished my run',exact:true}).click();
+await page.getByRole('button',{name:'Check my run result',exact:true}).waitFor();await page.reload();await page.getByRole('button',{name:'Check my run result',exact:true}).click();
 }
+await page.waitForLoadState('networkidle');
+await page.getByText('Choose a run or enter manually',{exact:true}).click();
 await page.locator('#ex_distance').fill('5');await page.locator('#ex_duration').fill('35');await page.locator('#ex_hr').fill('138');await page.locator('#ex_rpe').fill('3');
 await page.getByRole('button',{name:'Save execution and evaluate',exact:true}).click();
+await page.getByText('Run details and comparison evidence',{exact:true}).click();
 await page.getByRole('heading',{name:'Expected vs actual',exact:true}).waitFor();
 await page.getByText('Plan, progress and settings',{exact:true}).click();await page.getByRole('button',{name:'Progress',exact:true}).click();await page.locator('#coachReview').waitFor();
 await page.getByText('Plan, progress and settings',{exact:true}).click();await page.getByRole('button',{name:'You',exact:true}).click();await page.locator('#ap_age').waitFor();
