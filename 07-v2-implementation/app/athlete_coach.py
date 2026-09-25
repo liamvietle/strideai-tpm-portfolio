@@ -621,6 +621,7 @@ def evaluate(wid, athlete):
             "original_completion_ratio": round(x["distance_km"] / w["distance_km"], 3)
             if w["distance_km"]
             else None,
+            **split_analysis,
             "hr_drift_pct": drift,
             "pace_consistency_cv_pct": consistency,
             "comparison": comparison,

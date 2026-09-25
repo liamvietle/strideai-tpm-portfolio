@@ -98,18 +98,64 @@ def normalize(detail, streams, km, seconds):
                               'complete':bool(splits),'time_basis':'moving time'}}
 
 
-def split_metrics(splits,kind):
+def split_metrics(splits,kind, max_hr=None, threshold_hr=None):
+    """Joint split evidence. Zone durations are estimates from averages, not stream time-in-zone."""
     drift=consistency=None
+    context={'status':'insufficient_splits', 'drift_reason':'At least four valid splits with HR are needed.'}
+    valid=[s for s in splits if number(s.get('distance_km'),.001) and number(s.get('duration_seconds'),.001)]
+    if len(valid)!=len(splits):
+        return {'hr_drift_pct':None,'pace_consistency_cv_pct':None,'pace_hr_context':context}
     if len(splits)>=4:
         paces=[s['duration_seconds']/s['distance_km'] for s in splits]
         consistency=round(pstdev(paces)/mean(paces)*100,2)
-        if kind in ('easy','long','custom') and consistency<=10 and all(s.get('average_hr') for s in splits):
-            half=len(splits)//2
+        half=len(splits)//2
+        # Last quarter by split count captures a fast finish; weight aggregates by distance/time.
+        tail=max(1,len(splits)//4)
+        def summary(group):
+            seconds=sum(s['duration_seconds'] for s in group)
+            hr_ok=all(number(s.get('average_hr'),30,240) for s in group)
+            return {'pace':seconds/sum(s['distance_km'] for s in group),
+                    'hr':sum(s['average_hr']*s['duration_seconds'] for s in group)/seconds if hr_ok else None}
+        early,late=summary(splits[:-tail]),summary(splits[-tail:])
+        first,second=summary(splits[:half]),summary(splits[half:])
+        change=(late['pace']/early['pace']-1)*100
+        half_change=(second['pace']/first['pace']-1)*100
+        hr_ok=early['hr'] is not None and late['hr'] is not None
+        faster=change<=-5
+        context={'status':'faster_finish' if faster else 'variable_pace' if abs(change)>5 or abs(half_change)>5 else 'steady_pace',
+                 'earlier_pace_seconds_km':round(early['pace'],1),'finish_pace_seconds_km':round(late['pace'],1),
+                 'finish_pace_change_pct':round(change,1),'earlier_hr':round(early['hr'],1) if hr_ok else None,
+                 'finish_hr':round(late['hr'],1) if hr_ok else None,
+                 'finish_hr_change_bpm':round(late['hr']-early['hr'],1) if hr_ok else None,
+                 'interpretation':'A faster finish can explain a rising HR. It does not establish fatigue, intent or safety. Compare effort, zones, conditions and matched history.',
+                 'drift_reason':'Withheld: changing pace, session type or missing HR prevents a steady-effort comparison.'}
+        if kind in ('easy','long','custom') and consistency<=10 and abs(change)<=5 and abs(half_change)<=5 and hr_ok:
             def efficiency(group):
-                hr_time=sum(s['average_hr']*s['duration_seconds'] for s in group)
-                return sum(s['distance_km'] for s in group)/hr_time
+                return sum(s['distance_km'] for s in group)/sum(s['average_hr']*s['duration_seconds'] for s in group)
             drift=round((1-efficiency(splits[half:])/efficiency(splits[:half]))*100,2)
-    return {'hr_drift_pct':drift,'pace_consistency_cv_pct':consistency}
+            context['drift_reason']='Pace-normalized first/second-half estimate; terrain, heat and HR lag can still affect it.'
+    zone={'available':False,'basis':'No saved maximum HR', 'exact_time_in_zones_available':False}
+    if number(max_hr,80,240):
+        bins=[0.0]*5; coverage=0.0
+        for row in valid:
+            hr=number(row.get('average_hr'),30,240)
+            if hr is None: continue
+            ratio=hr/max_hr
+            index=0 if ratio<.6 else 1 if ratio<.7 else 2 if ratio<.8 else 3 if ratio<.9 else 4
+            bins[index]+=row['duration_seconds'];coverage+=row['duration_seconds']
+        zone={'available':bool(coverage),'basis':'Estimated bands from saved max HR; not athlete-calibrated zones',
+              'max_hr':max_hr,'boundaries_pct_max':[60,70,80,90],
+              'estimated_seconds_by_split_average':dict(zip(['Z1','Z2','Z3','Z4','Z5'],[round(v,1) for v in bins])),
+              'hr_coverage_seconds':round(coverage,1),'exact_time_in_zones_available':False,
+              'limitation':'Split averages hide within-split peaks. These are not measured time-in-zone or proof of easy effort.'}
+        if context.get('finish_hr') is not None:
+            zone['finish_pct_max']=round(context['finish_hr']/max_hr*100,1)
+    if number(threshold_hr,60,230):
+        zone['threshold_hr']=threshold_hr
+        if context.get('finish_hr') is not None:
+            zone['finish_pct_threshold']=round(context['finish_hr']/threshold_hr*100,1)
+    context['hr_zones']=zone
+    return {'hr_drift_pct':drift,'pace_consistency_cv_pct':consistency,'pace_hr_context':context}
 
 
 def apply_details(execution,run):
