@@ -4,6 +4,7 @@ from pathlib import Path
 
 def enhance_journey_ui(html):
     script = Path(__file__).with_name('journey_ui.js').read_text()
+    script += '\n' + Path(__file__).with_name('coach_questions_ui.js').read_text()
     style = '''<style>
 .nav{display:none!important}[hidden]{display:none!important}
 .journey-nav{margin:10px 0}.journey-nav summary{cursor:pointer;padding:10px 0;color:var(--muted)}.journey-links{display:flex;gap:6px;flex-wrap:wrap}
