@@ -101,3 +101,15 @@ def test_plan_ownership_invite_replay_and_origin(clients):
     proxy_headers={'Origin':'https://stride-ai.app','Host':'stride-ai.app','X-Forwarded-Proto':'https','X-Forwarded-Host':'stride-ai.app'}
     assert owner.post('/auth/login',headers=proxy_headers,json={'username':'owner','password':PASSWORD}).status_code==200
     assert owner.post('/auth/login',headers={**proxy_headers,'Origin':'http://stride-ai.app'},json={'username':'owner','password':PASSWORD}).status_code==403
+
+
+def test_coach_questions_account_scope_and_csrf(clients):
+    owner,other=clients
+    body={'question':'Am I improving over the last six weeks?'}
+    assert owner.post('/app/api/coach/questions',json=body,headers={'X-CSRF-Token':''}).status_code==403
+    response=owner.post('/app/api/coach/questions',json=body)
+    assert response.status_code==200,response.text
+    qid=response.json()['id']
+    assert other.get(f'/app/api/coach/questions/{qid}?athlete_id=viet').status_code==404
+    assert other.post('/app/api/coach/questions?athlete_id=viet',json={**body,'parent_id':qid}).status_code==404
+    assert other.get('/app/api/coach/questions?athlete_id=viet').json()['history']==[]

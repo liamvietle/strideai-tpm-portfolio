@@ -396,3 +396,21 @@ def test_coach_connection(athlete_id: str = 'viet'):
 def workout_briefing(wid: int, retry: bool = False, athlete_id: str = 'viet'):
     from app.coach_briefing import briefing
     return briefing(wid, athlete_id, retry)
+
+
+from app.coach_questions import Question
+
+@router.post('/questions')
+def ask_coach(payload: Question, athlete_id: str = 'viet'):
+    from app.coach_questions import answer
+    return answer(payload, athlete_id)
+
+@router.get('/questions')
+def coach_question_history(athlete_id: str = 'viet'):
+    from app.coach_questions import history, SUGGESTIONS
+    return {'suggestions':SUGGESTIONS,'history':history(athlete_id)}
+
+@router.get('/questions/{question_id}')
+def coach_question_answer(question_id: int, athlete_id: str = 'viet'):
+    from app.coach_questions import get_answer
+    return get_answer(question_id, athlete_id)
