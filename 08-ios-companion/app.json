@@ -2,12 +2,21 @@
   "expo": {
     "name": "StrideAI Health",
     "slug": "strideai-health",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.vietle.strideai.health"
+      "bundleIdentifier": "com.vietle.strideai.health",
+      "buildNumber": "2",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "processing"
+        ],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "com.expo.modules.backgroundtask.processing"
+        ]
+      }
     },
     "plugins": [
       [
@@ -18,7 +27,14 @@
           "background": false
         }
       ],
-      "expo-secure-store"
-    ]
+      "expo-secure-store",
+      "expo-background-task"
+    ],
+    "owner": "vietle268s-team",
+    "extra": {
+      "eas": {
+        "projectId": "73a4ebd2-7f5b-4c4d-9df1-dc76fba590aa"
+      }
+    }
   }
 }
