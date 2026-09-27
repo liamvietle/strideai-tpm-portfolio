@@ -92,11 +92,15 @@ def build_context(payload,athlete):
             if execution.get('activity_id') in runmap: execution=apply_details(execution,runmap[execution['activity_id']])
             evidence['selected_workout']['execution']=execution
             evidence['selected_workout']['split_analysis']=split_metrics(execution.get('splits') or [],target_kind,profile.max_hr,profile.threshold_hr)
+    if selected:
+        from app.run_context import read
+        evidence['selected_workout']['athlete_post_run_context']=read(selected['id'],athlete)
     for o in ranked:
         x=o['execution']; key='session_'+str(o.get('workout_id') or len(evidence))
         evidence[key]={'date':o['date'],'workout':o['workout'],
                        'actual':{k:x.get(k) for k in ('distance_km','duration_seconds','average_hr','effort','completed','pain','shortened_reason','notes')},
                        'recommendation':o.get('prediction'),'choice':o.get('choice'),
+                       'athlete_post_run_context':o.get('run_context'),
                        'outcome':{k:o['evaluation'].get(k) for k in ('quality','comparison','expected','recovery_response')},
                        'split_analysis':split_metrics(x.get('splits') or [],o['workout']['kind'],profile.max_hr,profile.threshold_hr)}
     # Include unlinked synced history, not only sessions evaluated through the app.

@@ -128,6 +128,9 @@ def workouts(athlete_id: str = "viet"):
                 r['historical_review_estimate']['timing'] = 'retrospective'
                 metrics = comparison_metrics(r)
             r["comparison_metrics"] = metrics
+            from app.run_context import read, assess
+            r['run_context'] = read(r['id'],athlete_id)
+            r['extra_distance_assessment'] = assess(r)
         result.append(r)
     return result
 
@@ -414,3 +417,16 @@ def coach_question_history(athlete_id: str = 'viet'):
 def coach_question_answer(question_id: int, athlete_id: str = 'viet'):
     from app.coach_questions import get_answer
     return get_answer(question_id, athlete_id)
+
+
+@router.get('/recovery-status')
+def recovery_availability(day: date | None = None, athlete_id: str = 'viet'):
+    from app.recovery_status import status
+    return status(athlete_id, day or store.today(athlete_id))
+
+from app.run_context import RunContext
+
+@router.post('/workouts/{wid}/run-context')
+def save_run_context(wid: int, payload: RunContext, athlete_id: str = 'viet'):
+    from app.run_context import save
+    return save(wid,payload,athlete_id)
