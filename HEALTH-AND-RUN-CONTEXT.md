@@ -1,0 +1,9 @@
+# Health availability and extra-distance context
+
+Today now shows a health-data card above the check-in. It reads only measurements for the selected date, labels each source and missing field, and shows latest Garmin/Apple Health dates and record update times under details. Garmin recovery remains an export import, not a live connection. Refresh checks the server; it does not fetch from Garmin or trigger iPhone sync. This reports available values, not a claim that the submitted check-in used them. Entered check-in values still take precedence. Update timestamps apply to the daily record and are not measurement timestamps.
+
+Runs more than max(0.2 km, 5%) beyond their saved execution target get an optional reason: felt fresh, pushed harder than intended, route/company, other, or unspecified. Notes are optional. Swapped targets and original target snapshots are respected. Context may be saved before or after evaluation. Revisions append to the additive `coach_run_context` table with athlete/workout identity, JSON and timestamp; the original execution, evaluation and applied plan decisions remain unchanged.
+
+A descriptive assessment combines the report with available pace/HR comparisons, measured drift and recovery concerns. Positive tolerance requires feeling fresh, completion and supportive pace/HR comparisons. It does not prove improved fitness or recovery, and never increases the plan automatically. Unknown physiology stays unknown. Context is available to post-run commentary, subsequent retrieved outcomes and selected-session questions. The coach cache version changes to refresh commentary.
+
+No new environment variables. The table and index initialize automatically. API authentication/CSRF and athlete ownership follow existing controls. Validation: 186 Python tests plus mobile health-status and post-evaluation context flow. No live private data or live model wording was tested.

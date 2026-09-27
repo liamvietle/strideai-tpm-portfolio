@@ -148,7 +148,7 @@ def runs(athlete):
 def observations(athlete):
     with connect() as c:
         rows = c.execute(
-            """SELECT w.date,w.original_json,w.current_json,p.prediction_json,d.choice,
+            """SELECT w.id AS workout_id,w.date,w.original_json,w.current_json,p.prediction_json,d.choice,
             x.execution_json,e.evaluation_json FROM coach_workouts w
             JOIN coach_evaluations e ON e.workout_id=w.id
             JOIN coach_executions x ON x.workout_id=w.id
@@ -182,8 +182,11 @@ def observations(athlete):
         evaluation = json.loads(r['evaluation_json'])
         if execution.get('split_source'):
             evaluation = {**evaluation,**split_metrics(execution['splits'],performed['kind'])}
+        from app.run_context import read
         result.append(
             {
+                "workout_id": r["workout_id"],
+                "run_context": read(r["workout_id"],athlete),
                 "date": r["date"],
                 "workout": performed,
                 "prediction": summary,

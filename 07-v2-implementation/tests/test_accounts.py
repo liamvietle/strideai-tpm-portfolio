@@ -113,3 +113,12 @@ def test_coach_questions_account_scope_and_csrf(clients):
     assert other.get(f'/app/api/coach/questions/{qid}?athlete_id=viet').status_code==404
     assert other.post('/app/api/coach/questions?athlete_id=viet',json={**body,'parent_id':qid}).status_code==404
     assert other.get('/app/api/coach/questions?athlete_id=viet').json()['history']==[]
+
+
+def test_health_status_is_scoped(clients):
+    owner,other=clients
+    from app.garmin_recovery import RecoveryImport,import_recovery
+    import_recovery(RecoveryImport(format='strideai-garmin-recovery-v1',days=[{'date':'2026-09-20','sleep_hours':7}]),'viet')
+    assert owner.get('/app/api/coach/recovery-status?day=2026-09-20').json()['status']=='partial'
+    assert other.get('/app/api/coach/recovery-status?day=2026-09-20&athlete_id=viet').json()['status']=='missing'
+    assert owner.post('/app/api/coach/workouts/1/run-context',json={'reason':'felt_fresh'},headers={'X-CSRF-Token':''}).status_code==403
