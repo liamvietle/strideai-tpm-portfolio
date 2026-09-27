@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -14,22 +15,42 @@ import {
   View,
 } from 'react-native';
 
-import { readDailyHealth } from './src/health';
-import { deleteSummaries, loadSettings, markAuthorized, saveSettings, sendSummaries, type Settings } from './src/sync';
+import { automaticEnabled, loadHistory, performSync, setAutomaticSync, type SyncHistory } from './src/automaticSync';
+import { deleteSummaries, loadSettings, saveSettings, type Settings } from './src/sync';
 
 export default function App() {
   const [settings, setSettings] = useState<Settings>({ baseUrl: 'https://stride-ai.app', accessKey: '', authorized: false });
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('Configure the secure connection, then authorize Apple Health.');
-  const [lastSummary, setLastSummary] = useState<{ date: string; sleep: number | null; hrv: number | null; rhr: number | null } | null>(null);
+  const [history, setHistory] = useState<SyncHistory | null>(null);
+  const [automatic, setAutomatic] = useState(false);
 
   useEffect(() => {
-    loadSettings().then((saved) => {
-      setSettings(saved);
-      setReady(true);
-      if (saved.authorized && saved.accessKey) void sync(saved, true);
+    async function resume() {
+      try {
+        const saved = await loadSettings();
+        const enabled = await automaticEnabled();
+        setSettings(saved);
+        setAutomatic(enabled);
+        setHistory(await loadHistory());
+        setReady(true);
+        if (enabled && saved.authorized && saved.accessKey) await sync(saved, true);
+      } catch (error) {
+        setReady(true);
+        setMessage(error instanceof Error ? error.message : 'Could not load connection.');
+      }
+    }
+    void resume();
+    let wasBackground = AppState.currentState === 'background';
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'background') wasBackground = true;
+      if (next === 'active' && wasBackground) {
+        wasBackground = false;
+        void resume();
+      }
     });
+    return () => subscription.remove();
   }, []);
 
   async function sync(active = settings, silent = false) {
@@ -38,17 +59,27 @@ export default function App() {
       return;
     }
     setBusy(true);
-    if (!silent) setMessage('Reading Apple Health and preparing daily summaries…');
+    setMessage('Reading Apple Health and preparing daily summaries…');
     try {
-      const summaries = await readDailyHealth(35);
-      const result = await sendSummaries(active, summaries);
-      await markAuthorized();
-      const latest = summaries[summaries.length - 1];
-      if (latest) setLastSummary({ date: latest.date, sleep: latest.sleep_hours, hrv: latest.hrv_ms, rhr: latest.resting_hr_bpm });
+      const result = await performSync(active, !silent, silent ? 'Automatic on open' : 'Manual');
+      setHistory(result);
       setSettings((current) => ({ ...current, authorized: true }));
-      setMessage(`Synced ${String(result.received ?? summaries.length)} days. Latest: ${String(result.latest_date ?? latest?.date ?? '—')}.`);
+      setMessage(`Synced ${result.days} days.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Apple Health sync failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleAutomatic() {
+    setBusy(true);
+    try {
+      await setAutomaticSync(!automatic);
+      setAutomatic(!automatic);
+      setMessage(automatic ? 'Automatic syncing turned off.' : 'Automatic syncing enabled. iOS chooses when background sync runs.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not change automatic syncing.');
     } finally {
       setBusy(false);
     }
@@ -79,9 +110,9 @@ export default function App() {
           style: 'destructive',
           onPress: () => {
             setBusy(true);
-            deleteSummaries(settings)
+            setAutomaticSync(false).then(() => { setAutomatic(false); return deleteSummaries(settings); })
               .then((deleted) => {
-                setLastSummary(null);
+                setHistory(null);
                 setMessage(`Deleted ${deleted} stored Apple Health summaries.`);
               })
               .catch((error) => setMessage(error instanceof Error ? error.message : 'Deletion failed.'))
@@ -143,13 +174,23 @@ export default function App() {
             </Pressable>
           </View>
 
-          {lastSummary && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Automatic syncing</Text>
+            <Text style={styles.permission}>Syncs when you reopen the app and requests background sync about twice a day. iOS controls timing. Keep Background App Refresh on and avoid swiping the app away.</Text>
+            <Pressable disabled={busy || !settings.authorized} onPress={toggleAutomatic} style={[styles.secondaryButton, (busy || !settings.authorized) && styles.disabled]}>
+              <Text style={styles.secondaryText}>{automatic ? 'Turn off automatic syncing' : 'Enable automatic syncing'}</Text>
+            </Pressable>
+            <Text style={styles.status}>Last successful sync: {history ? new Date(history.syncedAt).toLocaleString() : 'Not recorded yet'}</Text>
+            <Text style={styles.status}>Latest Health data: {history?.latestDate ?? 'Not recorded yet'}</Text>
+            {history && <Text style={styles.permission}>Synced via: {history.source}</Text>}
+          </View>
+          {history?.latest && (
             <View style={styles.summary}>
-              <Text style={styles.summaryDate}>LATEST · {lastSummary.date}</Text>
+              <Text style={styles.summaryDate}>LATEST · {history.latest.date}</Text>
               <View style={styles.metrics}>
-                <Metric label="Sleep" value={lastSummary.sleep == null ? '—' : `${lastSummary.sleep.toFixed(1)} h`} />
-                <Metric label="HRV" value={lastSummary.hrv == null ? '—' : `${Math.round(lastSummary.hrv)} ms`} />
-                <Metric label="Resting HR" value={lastSummary.rhr == null ? '—' : `${Math.round(lastSummary.rhr)} bpm`} />
+                <Metric label="Sleep" value={history.latest.sleep_hours == null ? '—' : `${history.latest.sleep_hours.toFixed(1)} h`} />
+                <Metric label="HRV" value={history.latest.hrv_ms == null ? '—' : `${Math.round(history.latest.hrv_ms)} ms`} />
+                <Metric label="Resting HR" value={history.latest.resting_hr_bpm == null ? '—' : `${Math.round(history.latest.resting_hr_bpm)} bpm`} />
               </View>
             </View>
           )}

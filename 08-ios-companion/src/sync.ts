@@ -44,6 +44,7 @@ export async function sendSummaries(settings: Settings, summaries: DailyHealthSu
   if (!summaries.length) throw new Error('No authorized Apple Health recovery samples were found.');
   const response = await fetch(`${settings.baseUrl}/app/api/apple-health/sync`, {
     method: 'POST',
+    signal: AbortSignal.timeout(25000),
     headers: {
       'Content-Type': 'application/json',
       'X-StrideAI-Key': settings.accessKey,
@@ -51,7 +52,7 @@ export async function sendSummaries(settings: Settings, summaries: DailyHealthSu
     body: JSON.stringify({
       athlete_id: 'viet',
       device_id: await deviceId(),
-      app_version: '1.0.0',
+      app_version: '1.1.0',
       generated_at: new Date().toISOString(),
       summaries,
     }),
